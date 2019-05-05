@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include "utilities.h"
+#include "constants.h"
 
 int main(){
 

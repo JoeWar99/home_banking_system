@@ -7,7 +7,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "utilities.h"
-
+#include "constants.h"
 
 
 int main(){
@@ -26,6 +26,13 @@ int main(){
         perror("open");
         exit(1);
     }
+
+
+    //MENSAGEM DE ENCERRAMENTO
+    //int fchmod(int fd, mode_t mode)
+
+    fchmod(secure_svr, 0444);
+
 
 
     
