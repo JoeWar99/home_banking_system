@@ -8,23 +8,34 @@
 #include <sys/stat.h>
 #include "utilities.h"
 #include "constants.h"
+#include "types.h"
 
+int main(int argc, char * argv[]){
 
-int main(){
-
-    int secure_svr;
-
-    if (mkfifo("/tmp/secure_svr", 0660) < 0 ) {
-        if(errno!=EEXIST){
-            printf("ERRO - could not create fifo /tmp/secure_svr\n");
-            exit(1);
-        } 
-        
+    if (argc != 3) {
+        printf("Usage: %s <n_threads> <admin_pwd>\n", argv[0]);
+        exit(RC_OTHER);
     }
 
-    if ((secure_svr = open("/tmp/secure_svr", O_RDWR)) == -1) {
+    int secure_svr;
+    int n_threads;
+
+    if (mkfifo(SERVER_FIFO_PATH, 0660) < 0 ) {
+        if(errno!=EEXIST){
+            printf("ERRO - could not create fifo %s\n", SERVER_FIFO_PATH);
+            exit(RC_OTHER);
+        }        
+    }
+
+    n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
+
+    // account id ; hash ; salt ; balance
+    struct bank_account admin_account = {0 , "hash", "salt", 0 };
+
+
+    if ((secure_svr = open(SERVER_FIFO_PATH, O_RDWR)) == -1) {
         perror("open");
-        exit(1);
+        exit(RC_SRV_DOWN);
     }
 
 
@@ -34,12 +45,10 @@ int main(){
     fchmod(secure_svr, 0444);
 
 
-
-    
     close(secure_svr);
-    unlink("/tmp/secure_svr");
+    unlink(SERVER_FIFO_PATH);
 
-    return 0;
+    return RC_OK;
 }
 
 

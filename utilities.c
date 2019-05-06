@@ -19,3 +19,7 @@ void concat(char *str1[], char *str2, size_t n)
 	/* Concatenate str2 */
 	strncat(*str1, str2, len2);
 }
+
+int min(int a, int b) {
+    return a < b ? a : b;
+}
