@@ -1,6 +1,5 @@
 #pragma once
 
-
 #include <stdlib.h>
 
 int min(int a, int b);
