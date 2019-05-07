@@ -35,7 +35,7 @@ int main(int argc, char * argv[]){
     n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
     // CREATE METHOD TO ADD ACCOUNTS - store in a list???
-    struct bank_account admin_account = {0 , "hash", "salt", 0 };
+    struct bank_account admin_account = {ADMIN_ACCOUNT_ID , "hash", "salt", 0 };
     gen_salt(admin_account.salt, SALT_LEN+1, SALT_LEN);
     gen_hash(argv[2], admin_account.salt, admin_account.hash);
 

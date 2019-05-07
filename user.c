@@ -11,6 +11,69 @@
 #include "constants.h"
 #include "types.h"
 
+int valid_request_arguments(int operation, char * req_args, int req_arg_count) {
+    switch(operation) {
+        case OP_CREATE_ACCOUNT:
+            if (req_arg_count != 3) {
+                fprintf(STDERR_FILENO, "Create account operation requires 3 arguments\n");
+                return -1;
+            }
+
+            int account_id = atoi(req_args[0]);
+            int balance = atoi(req_args[1]);
+            char * pwd = req_args[2];
+
+            if (account_id <= 0 || account_id >= MAX_BANK_ACCOUNTS) {
+                fprintf(STDERR_FILENO, "Invalid account ID: %d\n", account_id);
+                return -1;
+            }
+
+            if (balance <= 0 || balance > MAX_BALANCE) {
+                fprintf(STDERR_FILENO, "Invalid balance value: %d\n", balance);
+                return -1;
+            }
+
+            if (strlen(pwd) < MIN_PASSWORD_LEN || strlen(pwd) > MAX_PASSWORD_LEN) {
+                fprintf(STDERR_FILENO, "Password length must be between %d and %d\n", MIN_PASSWORD_LEN, MAX_PASSWORD_LEN);
+                return -1;
+            }          
+
+            break;
+        case OP_BALANCE:
+            if (req_arg_count != 0) {
+                fprintf(STDERR_FILENO, "Balance check operation requires no arguments\n");
+                return -1;
+            }
+            break;
+        case OP_TRANSFER:
+            if (req_arg_count != 2) {
+                fprintf(STDERR_FILENO, "Transfer operation requires 2 arguments\n");
+                return -1;
+            }
+            int dest_account_id = atoi(req_args[0]);
+            int amount = atoi(req_args[1]);
+            
+            if (dest_account_id <= 0 || dest_account_id >= MAX_BANK_ACCOUNTS) {
+                fprintf(STDERR_FILENO, "Invalid account ID: %d\n", dest_account_id);
+                return -1;
+            }
+
+            if (amount <= 0 || amount > MAX_BALANCE) {
+                fprintf(STDERR_FILENO, "Invalid amount value: %d\n", amount);
+                return -1;
+            }
+
+            break;
+        case OP_SHUTDOWN:
+            if (req_arg_count != 0) {
+                fprintf(STDERR_FILENO, "Shutdown account operation requires no arguments\n");
+                return -1;
+            }
+            break;
+    }
+    return 0;
+}
+
 int main(int argc, char * argv[]){
 
     if (argc != 6) {
@@ -21,7 +84,7 @@ int main(int argc, char * argv[]){
     int pid  = getpid();    
     char string_pid[64];
     int secure_svr;
-    //int acccount_id, op_delay, operation;
+    //int account_id, op_delay, operation;
     int operation;
 
     //acccount_id = atoi(argv[1]);
@@ -51,15 +114,8 @@ int main(int argc, char * argv[]){
         token = strtok(NULL, delim);
     }
 
-    // TODO check arguments values
-    int expected_args = 0;
-    if (operation == OP_CREATE_ACCOUNT)
-        expected_args = 3;
-    else if (operation == OP_TRANSFER)
-        expected_args = 2;
-        
-    if (expected_args != req_arg_count) {
-        printf("Invalid number of arguments for requested operation\n");
+    if(valid_request_arguments(operation, req_args, req_arg_count) == -1) {
+        fprintf(STDERR_FILENO, "Invalid request arguments\n");
         exit(RC_OTHER);
     }
 
