@@ -71,6 +71,7 @@ typedef struct bank_account {
  */
 typedef struct req_header {
   pid_t pid;
+  int operation;
   uint32_t account_id;
   char password[MAX_PASSWORD_LEN + 1];
   uint32_t op_delay_ms;

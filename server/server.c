@@ -45,15 +45,30 @@ int main(int argc, char * argv[]){
         exit(RC_SRV_DOWN);
     }
 
+ while (1)
+    {
+        /* code */
+    }
+    
+
 
     //MENSAGEM DE ENCERRAMENTO
     //int fchmod(int fd, mode_t mode)
 
-    fchmod(secure_svr, 0444);
+    if(fchmod(secure_svr, 0444) != 0){
+        perror("fchmod: error altering server fifo permissions");
+        exit(RC_OTHER);
+    }
 
 
-    close(secure_svr);
-    unlink(SERVER_FIFO_PATH);
+    if(close(secure_svr)!= 0){ 
+        perror("close: error closing down server fifo");
+        exit(RC_OTHER);
+    }
+    if(unlink(SERVER_FIFO_PATH)!= 0){
+        perror("unlink: error unlinking user fifo");
+        exit(RC_OTHER);
+    }
 
     return RC_OK;
 }
