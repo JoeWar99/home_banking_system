@@ -7,6 +7,7 @@
 #include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <pthread.h>
 #include "../shared/vetor.h"
 #include "../shared/utilities.h"
 #include "../shared/constants.h"
@@ -42,10 +43,18 @@ int main(int argc, char * argv[]){
         exit(RC_OTHER);
     }
 
+    int n_threads;
+    int id;
+    n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
+    pthread_t thread_id[MAX_BANK_OFFICES];
+    
+    for(int i = 0; i < n_threads; i++){
+        if(pthread_create(&thread_id[i], NULL, balconies,  &id))
+    }
+    
     srand(time(NULL));
 
     int secure_svr;
-    int n_threads;
     
     
 
@@ -61,7 +70,6 @@ int main(int argc, char * argv[]){
         }        
     }
 
-    n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
     // CREATE METHOD TO ADD ACCOUNTS - store in a list???
     struct bank_account admin_account = {ADMIN_ACCOUNT_ID , "hash", "salt", 0 };
@@ -71,7 +79,7 @@ int main(int argc, char * argv[]){
 
     vetor_insere(accounts_database, &admin_account, -1);
 
-    
+
 
     if ((secure_svr = open(SERVER_FIFO_PATH, O_RDWR)) == -1) {
         perror("open");
@@ -79,11 +87,7 @@ int main(int argc, char * argv[]){
     }
 
     
-    
-    while (1)
-    {
-        /* code */
-    }
+
     
     if(fchmod(secure_svr, 0444) != 0){
         perror("fchmod: error altering server fifo permissions");
