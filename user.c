@@ -51,6 +51,7 @@ int main(int argc, char * argv[]){
         token = strtok(NULL, delim);
     }
 
+    // TODO check arguments values
     int expected_args = 0;
     if (operation == OP_CREATE_ACCOUNT)
         expected_args = 3;
