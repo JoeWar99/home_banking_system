@@ -32,6 +32,8 @@ int main(int argc, char * argv[]){
     // account id ; hash ; salt ; balance
     struct bank_account admin_account = {0 , "hash", "salt", 0 };
 
+    printf("%d %s %s %d\n", admin_account.account_id, admin_account.hash, admin_account.salt, admin_account.balance);
+
 
     if ((secure_svr = open(SERVER_FIFO_PATH, O_RDWR)) == -1) {
         perror("open");
