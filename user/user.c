@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-     // <account_id> <account_pwd> <delay> <operation> <request_args>
+    // <account_id> <account_pwd> <delay> <operation> <request_args>
 
     req_header_t user_header;
     user_header.account_id = atoi(argv[1]);
@@ -81,26 +81,25 @@ int main(int argc, char *argv[])
     user_header.op_delay_ms = atoi(argv[3]);
     user_header.operation = operation;
 
-     switch(operation) {
-        case OP_CREATE_ACCOUNT:
-            req_create_account_t user_create;
-            user_create.account_id = atoi(req_args[0]);
-            user_create.balance = atoi(req_args[1]);
-            strcpy(user_create.password, req_args[2]);
-            break;
+    switch (operation)
+    {
+    case OP_CREATE_ACCOUNT:
+        req_create_account_t user_create;
+        user_create: ;
+        user_create.account_id = atoi(req_args[0]);
+        user_create.balance = atoi(req_args[1]);
+        strcpy(user_create.password, req_args[2]);
+        break;
 
-        case OP_TRANSFER:
-            req_transfer_t user_transfer;
-            user_transfer.account_id = atoi(req_args[0]);
-            user_transfer.amount = atoi(req_args[1]);
-            break;
+    case OP_TRANSFER:
+        req_transfer_t user_transfer;
+        user_transfer: ;
+        user_transfer.account_id = atoi(req_args[0]);
+        user_transfer.amount = atoi(req_args[1]);
+        break;
     }
 
-
-
     //Opening server fifo
-    
-
 
     if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY)) == -1)
     {
@@ -108,47 +107,75 @@ int main(int argc, char *argv[])
         exit(RC_SRV_DOWN);
     }
 
-    if(write(secure_svr, &user_header,sizeof(req_header_t)*1)!=sizeof(req_header_t)){
+    if (write(secure_svr, &user_header, sizeof(req_header_t) * 1) != sizeof(req_header_t))
+    {
         perror("write: error writing to server");
         exit(RC_OTHER);
     }
 
+    switch (operation)
+    {
+    case OP_CREATE_ACCOUNT:
 
+        if (write(secure_svr, &user_create, sizeof(req_create_account_t) * 1) != sizeof(req_create_account_t))
+        {
+            perror("write: error writing to server");
+            exit(RC_OTHER);
+        }
+
+        break;
+
+    case OP_TRANSFER:
+        
+        if (write(secure_svr, &user_transfer, sizeof(req_transfer_t) * 1) != sizeof(req_transfer_t))
+        {
+            perror("write: error writing to server");
+            exit(RC_OTHER);
+        }
+
+        break;
+    }
 
     // Waiting for server response or timeout
 
-    
 
-   
+  //  while(read (user_fifo,  ,   ) != 0     ||  FIFO_TIMEOUT_SECS  ){
 
 
+
+
+
+  //  }
 
     // Free alocated memory
 
-    for (int i = 0; i < req_arg_count ; i++){
+    for (int i = 0; i < req_arg_count; i++)
+    {
         free(req_args[i]);
     }
 
-    char string_fifo_user_aux [strlen(string_fifo_user)+1];
+    char string_fifo_user_aux[strlen(string_fifo_user) + 1];
     strcpy(string_fifo_user_aux, string_fifo_user);
     free(string_fifo_user);
 
     // Closing down fifos and unlinking user fifo
 
-    if(close(secure_svr) != 0){
+    if (close(secure_svr) != 0)
+    {
         perror("close: error closing down server fifo");
         exit(RC_OTHER);
     }
-    if(close(user_fifo)!= 0){
+    if (close(user_fifo) != 0)
+    {
         perror("close: error closing down user fifo");
         exit(RC_OTHER);
     }
 
-    if(unlink(string_fifo_user_aux)!= 0){
+    if (unlink(string_fifo_user_aux) != 0)
+    {
         perror("unlink: error unlinking user fifo");
         exit(RC_OTHER);
     }
 
     return RC_OK;
-
 }

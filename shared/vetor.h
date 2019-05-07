@@ -3,7 +3,7 @@
 /*****************************************************************/
 
 #ifndef VETOR_H
-#define QUEUE_H
+#define VETOR_H
 #include <stdio.h>
 #include <string.h>
 #include "types.h"
@@ -96,6 +96,9 @@ int vetor_atribui(vetor *vec, int pos, const bank_account_t* str);
 *  retorno: posicao do elemento ou -1 se ocorrer algum erro ou nao encontrar elemento
 */
 int vetor_pesquisa(vetor *vec, const bank_account_t* str);
+
+
+int vetor_free(vetor *vec);
 
 #define VETOR_H
 #endif
