@@ -8,10 +8,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include "utilities.h"
-#include "constants.h"
-#include "types.h"
-#include "crypto.h"
+#include "../shared/utilities.h"
+#include "../shared/constants.h"
+#include "../shared/types.h"
+#include "../shared/crypto.h"
 
 int main(int argc, char * argv[]){
 

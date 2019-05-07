@@ -7,9 +7,10 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <string.h>
-#include "utilities.h"
-#include "constants.h"
-#include "types.h"
+
+#include "../shared/utilities.h"
+#include "../shared/constants.h"
+#include "../shared/types.h"
 
 int parse_req_args(char * req_args_string, char * req_args[3], int * req_arg_count) {
 
@@ -46,7 +47,8 @@ int valid_req_args(int operation, char ** req_args, int req_arg_count) {
             }
 
             int account_id = atoi(req_args[0]);
-            int balance = atoi(req_args[1]);
+            char *ptr1;
+            long unsigned int balance = strtoul(req_args[1], &ptr1, 10);
             char * pwd = req_args[2];
 
             if (account_id <= 0 || account_id >= MAX_BANK_ACCOUNTS) {
@@ -55,7 +57,7 @@ int valid_req_args(int operation, char ** req_args, int req_arg_count) {
             }
 
             if (balance <= 0 || balance > MAX_BALANCE) {
-                fprintf(stderr, "Invalid balance value: %d\n", balance);
+                fprintf(stderr, "Invalid balance value: %lu\n", balance);
                 return -1;
             }
 
@@ -78,7 +80,8 @@ int valid_req_args(int operation, char ** req_args, int req_arg_count) {
                 return -1;
             }
             int dest_account_id = atoi(req_args[0]);
-            int amount = atoi(req_args[1]);
+            char *ptr2;
+            long unsigned int amount = strtoul(req_args[1], &ptr2, 10);
             
             if (dest_account_id <= 0 || dest_account_id >= MAX_BANK_ACCOUNTS) {
                 fprintf(stderr, "Invalid account ID: %d\n", dest_account_id);
@@ -86,7 +89,7 @@ int valid_req_args(int operation, char ** req_args, int req_arg_count) {
             }
 
             if (amount <= 0 || amount > MAX_BALANCE) {
-                fprintf(stderr, "Invalid amount value: %d\n", amount);
+                fprintf(stderr, "Invalid amount value: %lu\n", amount);
                 return -1;
             }
 

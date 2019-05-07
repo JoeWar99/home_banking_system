@@ -1,23 +1,28 @@
-all: project
+CC=gcc
+CFLAGS=-Wextra
 
-project: main.o server.o user.o utilities.o log.o
-			gcc main.o server.o user.o utilities.o log.o -o banking -Wextra
+all: user server
 
+user: user.o crypto.o utilities.o
+	$(CC) user.o utilities.o crypto.o -o user_exe $(CFLAGS)
 
-main.o : main.c 
-			gcc -c main.c -Wextra
+server: server.o crypto.o utilities.o
+	$(CC) server.o utilities.o crypto.o -o server_exe $(CFLAGS)
 
-server.o: forensic.c parse.c log.c
-				gcc -c forensic.c -Wextra
+server.o: server/server.c
+	$(CC) -c server/server.c $(CFLAGS)
 
-user.o: user.c
-		gcc -c user.c -Wextra
+user.o: user/user.c
+	$(CC) -c user/user.c $(CFLAGS)
 
-utilities.o: utilities.c
-			gcc -c utilities.c -Wextra
+crypto.o: shared/crypto.c
+	$(CC) -c shared/crypto.c $(CFLAGS)
 
-log.o: log.c
-					gcc -c log.c -Wextra
+utilities.o: shared/utilities.c
+	$(CC) -c shared/utilities.c $(CFLAGS)
+
+log.o: shared/log.c
+	$(CC) -c shared/log.c $(CFLAGS)
 
 clean: 
-		rm -rf *o banking
+	rm *.o user_exe server_exe
