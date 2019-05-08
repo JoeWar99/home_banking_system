@@ -103,6 +103,15 @@ void *balconies(void *arg)
         exit(RC_OTHER);
     }
 
+
+    if (close(user_fifo) != 0)
+    {
+        perror("close: error closing down server fifo");
+        exit(RC_OTHER);
+    }
+
+
+
     free(request_reply);
     free(string_pid);
     free(secure_fifo_name);
