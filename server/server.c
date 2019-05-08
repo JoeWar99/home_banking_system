@@ -15,6 +15,7 @@
 #include "../shared/crypto.h"
 #include "../shared/queue.h"
 #include "../shared/account_utilities.h"
+#include "requests.h"
 
 #define SHARED 0
 
@@ -165,6 +166,22 @@ int main(int argc, char *argv[])
 		 * 	3) Se válido executar pedido
 		 * 	4) Responder ao cliente
 		 */
+		tlv_request_t * first_request = (tlv_request_t * )queue_front(resquest_queue);
+		if(first_request == NULL){
+			perror("queue_front: error getting first queue element");
+        	exit(RC_OTHER);
+		}
+
+		if(queue_pop(resquest_queue) != 0){
+			perror("queue_pop: error removing first queue element");
+        	exit(RC_OTHER);
+		}
+
+		int ret;
+		if((ret = is_valid_request(first_request, accounts_database)) == 0)
+			printf("Valid request. Return: %d\n", ret);
+		else
+			printf("Invalid request. Return: %d\n", ret);
 
         // pseudo codigo
 
