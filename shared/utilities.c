@@ -24,3 +24,9 @@ void concat(char *str1[], char *str2, size_t n)
 int min(int a, int b) {
     return a < b ? a : b;
 }
+
+long unsigned int str_to_lu(char * str) {
+	char *ptr1;
+	long unsigned int balance = strtoul(str, &ptr1, 10);
+	return balance;
+}

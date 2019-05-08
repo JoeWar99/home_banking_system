@@ -25,40 +25,20 @@ int main(int argc, char *argv[])
     int pid = getpid();
     char string_pid[64];
     int secure_svr;
-    //int account_id, op_delay, operation;
-    int operation;
+    int account_id, op_delay, operation;
 
-    int user_fifo;
-    char *string_fifo_user = (char *)malloc(sizeof(char) * strlen(USER_FIFO_PATH_PREFIX) + 1);
-
-    strcpy(string_fifo_user, USER_FIFO_PATH_PREFIX);
-    string_fifo_user[strlen(USER_FIFO_PATH_PREFIX) + 1] = '\0';
-    sprintf(string_pid, "%d", pid);
-    string_pid[strlen(string_pid) + 1] = '\0';
-
-    concat(&string_fifo_user, string_pid, strlen(string_pid));
-
-    if (mkfifo(string_fifo_user, 0660) < 0)
-    {
-        if (errno != EEXIST)
-        {
-            printf("Could not create fifo %s\n", SERVER_FIFO_PATH);
-            exit(RC_OTHER);
-        }
-    }
-
-    if ((user_fifo = open(string_fifo_user, O_RDONLY)) == -1)
-    {
-        perror("open");
-        exit(RC_USR_DOWN);
-    }
-
-    //acccount_id = atoi(argv[1]);
-    //op_delay = atoi(argv[3]);
+    account_id = atoi(argv[1]);
+    char * pwd = argv[2];
+    op_delay = atoi(argv[3]);
     operation = atoi(argv[4]);
 
     char *req_args[3];
-    int req_arg_count;
+    int req_arg_count = 0;
+
+    if (!valid_args(account_id,pwd, op_delay, operation)) {
+        fprintf(stderr, "Invalid arguments given\n");
+        exit(RC_OTHER);
+    }
 
     if (parse_req_args(argv[5], req_args, &req_arg_count) == -1)
     {
@@ -66,37 +46,65 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-    if (valid_req_args(operation, req_args, req_arg_count) == -1)
+    if (!valid_req_args(operation, req_args, req_arg_count))
     {
         fprintf(stderr, "Invalid request arguments\n");
         exit(RC_OTHER);
     }
 
-    // <account_id> <account_pwd> <delay> <operation> <request_args>
 
-    req_header_t user_header;
-    user_header.account_id = atoi(argv[1]);
-    user_header.pid = pid;
-    strcpy(user_header.password, argv[2]);
-    user_header.op_delay_ms = atoi(argv[3]);
-    user_header.operation = operation;
+    int user_fifo;
+    char *secure_fifo_name = (char *)malloc(sizeof(char) * (strlen(USER_FIFO_PATH_PREFIX) + 1));
 
+    strcpy(secure_fifo_name, USER_FIFO_PATH_PREFIX);
+    secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + 1] = '\0';
+    //printf("%s\n", secure_fifo_name);
+    sprintf(string_pid, "%d", pid);
+    string_pid[strlen(string_pid) + 1] = '\0';
+
+    concat(&secure_fifo_name, string_pid, strlen(string_pid));
+
+    if (mkfifo(secure_fifo_name, 0660) < 0)
+    {
+        if (errno != EEXIST)
+        {
+            fprintf(stderr, "Could not create fifo %s\n", SERVER_FIFO_PATH);
+            exit(RC_OTHER);
+        }
+    }
+
+    if ((user_fifo = open(secure_fifo_name, O_RDONLY)) == -1)
+    {
+        perror("open");
+        exit(RC_USR_DOWN);
+    }
+
+
+    // TODO use full struct
+    req_value_t request_value;
+
+    req_header_t * user_header = &request_value.header;
+    user_header->pid = pid;
+    user_header->account_id = account_id;
+    strcpy(user_header->password, pwd);
+    user_header->op_delay_ms = op_delay;
+
+    req_create_account_t * user_create;
+    req_transfer_t * user_transfer;
     switch (operation)
     {
-    case OP_CREATE_ACCOUNT:
-        req_create_account_t user_create;
-        user_create: ;
-        user_create.account_id = atoi(req_args[0]);
-        user_create.balance = atoi(req_args[1]);
-        strcpy(user_create.password, req_args[2]);
-        break;
+        case OP_CREATE_ACCOUNT:
+            user_create = &request_value.create;
+            user_create->account_id = atoi(req_args[0]);
+            user_create->balance = atoi(req_args[1]);
+            strcpy(user_create->password, req_args[2]);
+            break;
 
-    case OP_TRANSFER:
-        req_transfer_t user_transfer;
-        user_transfer: ;
-        user_transfer.account_id = atoi(req_args[0]);
-        user_transfer.amount = atoi(req_args[1]);
-        break;
+        case OP_TRANSFER:
+            user_transfer = &request_value.transfer;
+            user_transfer->account_id = atoi(req_args[0]);
+            user_transfer->amount = atoi(req_args[1]);
+            break;
     }
 
     //Opening server fifo
@@ -107,33 +115,10 @@ int main(int argc, char *argv[])
         exit(RC_SRV_DOWN);
     }
 
-    if (write(secure_svr, &user_header, sizeof(req_header_t) * 1) != sizeof(req_header_t))
+    if (write(secure_svr, &request_value, sizeof(req_value_t) * 1) != sizeof(req_value_t))
     {
         perror("write: error writing to server");
         exit(RC_OTHER);
-    }
-
-    switch (operation)
-    {
-    case OP_CREATE_ACCOUNT:
-
-        if (write(secure_svr, &user_create, sizeof(req_create_account_t) * 1) != sizeof(req_create_account_t))
-        {
-            perror("write: error writing to server");
-            exit(RC_OTHER);
-        }
-
-        break;
-
-    case OP_TRANSFER:
-        
-        if (write(secure_svr, &user_transfer, sizeof(req_transfer_t) * 1) != sizeof(req_transfer_t))
-        {
-            perror("write: error writing to server");
-            exit(RC_OTHER);
-        }
-
-        break;
     }
 
     // Waiting for server response or timeout
@@ -154,9 +139,9 @@ int main(int argc, char *argv[])
         free(req_args[i]);
     }
 
-    char string_fifo_user_aux[strlen(string_fifo_user) + 1];
-    strcpy(string_fifo_user_aux, string_fifo_user);
-    free(string_fifo_user);
+    char string_fifo_user_aux[strlen(secure_fifo_name) + 1];
+    strcpy(string_fifo_user_aux, secure_fifo_name);
+    free(secure_fifo_name);
 
     // Closing down fifos and unlinking user fifo
 

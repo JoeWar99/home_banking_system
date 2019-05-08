@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <pthread.h>
+
 #include "../shared/vetor.h"
 #include "../shared/utilities.h"
 #include "../shared/constants.h"
@@ -49,7 +50,10 @@ int main(int argc, char * argv[]){
     pthread_t thread_id[MAX_BANK_OFFICES];
     
     for(int i = 0; i < n_threads; i++){
-        if(pthread_create(&thread_id[i], NULL, balconies,  &id))
+        if(pthread_create(&thread_id[i], NULL, balconies,  &id)!=0){
+            perror("pthread_create: error creating thread ");
+            exit(RC_OTHER);
+        }
     }
     
     srand(time(NULL));
@@ -72,13 +76,11 @@ int main(int argc, char * argv[]){
 
 
     // CREATE METHOD TO ADD ACCOUNTS - store in a list???
-    struct bank_account admin_account = {ADMIN_ACCOUNT_ID , "hash", "salt", 0 };
+    bank_account_t admin_account = {ADMIN_ACCOUNT_ID , "hash", "salt", 0 };
     gen_salt(admin_account.salt, SALT_LEN+1, SALT_LEN);
     gen_hash(argv[2], admin_account.salt, admin_account.hash);
 
-
     vetor_insere(accounts_database, &admin_account, -1);
-
 
 
     if ((secure_svr = open(SERVER_FIFO_PATH, O_RDWR)) == -1) {

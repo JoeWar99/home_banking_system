@@ -1,5 +1,7 @@
 #include "queue.h"
 
+#include <stdlib.h>
+
 queue *init_queue(){
 	queue* new = (queue *) malloc (sizeof(queue));
 	if (new == NULL) return NULL;
@@ -7,12 +9,12 @@ queue *init_queue(){
 	return new;
 }
 
-queue_ele *new_ele(struct bank_account * val){
+queue_ele *new_ele(bank_account_t * val){
 	queue_ele *new = (queue_ele *)malloc(sizeof(queue_ele));
 	if (new == NULL) return NULL;
 
-	struct bank_account  *content;
-	content = (struct bank_account *)malloc(sizeof(struct bank_account));
+	bank_account_t  *content;
+	content = (bank_account_t *)malloc(sizeof(bank_account_t));
 	if (content == NULL) return NULL;
 
 	content->account_id = val->account_id;
@@ -45,7 +47,7 @@ int queue_size(queue *q) {
 	return size;
 }
 
-int queue_push(queue *q, struct bank_account * val){
+int queue_push(queue *q, bank_account_t * val){
 
 	/* Check null pointer */
 	if(q == NULL)
@@ -88,7 +90,7 @@ int queue_pop(queue *q){
 	return 0;
 }
 
-const struct bank_account * queue_front(queue *q){
+const bank_account_t * queue_front(queue *q){
 
 	/* Check null pointers */
 	if(q == NULL || q->front == NULL)

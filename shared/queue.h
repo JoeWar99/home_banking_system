@@ -16,7 +16,7 @@
  */
 typedef struct _queue_ele {
 	struct _queue_ele *next;
-	struct bank_account *val;
+	bank_account_t *val;
 } queue_ele;
 
 /**
@@ -39,7 +39,7 @@ queue* init_queue();
  * @param val Value of the new node
  * @return New element of type queue_ele
  */
-queue_ele *new_ele(struct bank_account * val);
+queue_ele *new_ele(bank_account_t * val);
 
 /**
  * @brief checks if the queue is empty
@@ -64,7 +64,7 @@ int queue_size(queue *q);
  * @param val value of the new element
  * @return Return 0 upon success and -1 otherwise
  */
-int queue_push(queue *q, struct bank_account * val);
+int queue_push(queue *q, bank_account_t * val);
 
 /**
  * @brief removes the front of the queue
@@ -80,7 +80,7 @@ int queue_pop(queue *q);
  * @param q queue to get element from
  * @return Char on top of queue
  */
-const struct bank_account * queue_front(queue *q);
+const bank_account_t * queue_front(queue *q);
 
 /**
  * @brief deletes the queue data structure

@@ -74,7 +74,6 @@ typedef struct req_header {
   uint32_t account_id;
   char password[MAX_PASSWORD_LEN + 1];
   uint32_t op_delay_ms;
-  int operation;
 } __attribute__((packed)) req_header_t;
 
 /**
