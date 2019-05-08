@@ -8,3 +8,7 @@ int valid_req_args(int operation, char ** req_args, int req_arg_count);
 
 // TODO: refactoring por noutro sitio que o server tbm usa (??)
 int valid_pwd(char * pwd);
+
+int valid_user_account_id(int account_id);
+
+int valid_account_id(int account_id);

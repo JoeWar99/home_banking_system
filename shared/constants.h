@@ -32,7 +32,7 @@
 #define USER_FIFO_PATH_LEN (sizeof(USER_FIFO_PATH_PREFIX) + WIDTH_ID + 1)
 
 
-/*#define OK 1               // operação bem-sucedida;
+#define OK 1               // operação bem-sucedida;
 #define SRV_DOWN  2        // não é possível abrir o FIFO /tmp/secure_srv (servidor indisponível);
 #define SRV_TIMEOUT 3      // o pedido expirou (a resposta não foi recebida dentro do tempo limite);
 #define USR_DOWN 4         //não é possível abrir o FIFO /tmp/secure_XXXXX (utilizador indisponível);
@@ -44,5 +44,5 @@
 #define NO_FUNDS 10        // a operação não pode ser realizada porque o saldo corrente é insuficiente;
 #define TOO_HIGH 11        // a operação não pode ser realizada porque o saldo final é demasiado elevado;
 #define OTHER 12           //qualquer outro erro que não tenha sido especificado
-*/
+
 #define FIFO_TIMEOUT_SECS 30

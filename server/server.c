@@ -9,7 +9,6 @@
 #include <sys/stat.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include "../shared/vetor.h"
 #include "../shared/utilities.h"
 #include "../shared/constants.h"
 #include "../shared/types.h"
@@ -22,7 +21,8 @@
 
 sem_t full, empty;
 pthread_mutex_t mutex_accounts_database = PTHREAD_MUTEX_INITIALIZER;
-vetor *accounts_database;
+/* Max Bank Account number + 1 (admin) */
+bank_account_t * accounts_database[MAX_BANK_ACCOUNTS + 1];
 queue_t *resquest_queue;
 
 void *balconies(void *arg)
@@ -68,10 +68,12 @@ int main(int argc, char *argv[])
     }
 
 
-    accounts_database = vetor_novo();
-    resquest_queue = init_queue();
-    int n_threads;
-    n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
+    if((resquest_queue = init_queue()) == NULL){
+        perror("init_queue: error initialing the queue");
+        exit(RC_OTHER);
+    }
+
+    int n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
     //   INITIALIZING SEMAPHORES , PARA DEPOIS  QUANDO ESTIVEREMOS A TRATAR DA SINCRONIZAÇAO
 
@@ -88,7 +90,7 @@ int main(int argc, char *argv[])
     }*/
 
     int id;
-    pthread_t thread_id[MAX_BANK_OFFICES];
+    pthread_t thread_id[n_threads];
 
     for (int i = 0; i < n_threads; i++)
     {
@@ -118,7 +120,7 @@ int main(int argc, char *argv[])
     gen_salt(admin_account.salt, SALT_LEN + 1, SALT_LEN);
     gen_hash(pwd, admin_account.salt, admin_account.hash);
 
-    vetor_insere(accounts_database, &admin_account, -1);
+	accounts_database[admin_account.account_id] = &admin_account;
 
     if ((secure_svr = open(SERVER_FIFO_PATH, O_RDWR)) == -1)
     {
@@ -148,10 +150,23 @@ int main(int argc, char *argv[])
 					printf("shutdown\n");
 					break;
 			}
+
+			if(queue_push(resquest_queue, &request) != 0){
+				perror("queue_push: error pushing request to queue");
+				exit(RC_OTHER);
+			}
             
 		}
 
-        // inserir na queue
+		// TODO: por num thread
+		/**
+		 * Passos:
+		 * 	1) Receber pedido
+		 *  2) Validar pedido
+		 * 	3) Se válido executar pedido
+		 * 	4) Responder ao cliente
+		 */
+
         // pseudo codigo
 
         /*   Process Producer;
@@ -182,14 +197,7 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-
-    if (vetor_free(accounts_database) != 0)
-    {
-        perror("vetor_free: error emptying vector");
-        exit(RC_OTHER);
-    }
-
-    free(accounts_database);
+	// TODO: fazer free do array
 
     if (close(secure_svr) != 0)
     {

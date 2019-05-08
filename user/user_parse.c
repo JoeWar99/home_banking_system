@@ -7,8 +7,12 @@
 #include "../shared/types.h"
 #include "../shared/utilities.h"
 
+int valid_account_id(int account_id){
+	return account_id >= 0 && account_id < MAX_BANK_ACCOUNTS;
+}
+
 int valid_user_account_id(int account_id) {
-    return account_id >= 0 && account_id < MAX_BANK_ACCOUNTS;
+	return valid_account_id(account_id) && account_id != 0;
 }
 
 int valid_pwd(char * pwd) {
@@ -25,7 +29,7 @@ int valid_delay(int delay) {
 
 int valid_args(int account_id, char * account_pwd, int delay, int operation) {
 
-    if (!valid_user_account_id(account_id)) {
+    if (!valid_account_id(account_id)) {
         fprintf(stderr, "Invalid account ID: %d\n", account_id);
         return 0;
     }
