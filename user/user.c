@@ -91,6 +91,7 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Invalid request arguments\n");
         exit(RC_OTHER);
     }
+    printf("estou aqui\n");
 
     int user_fifo;
     char *secure_fifo_name = (char *)malloc(sizeof(char) * (strlen(USER_FIFO_PATH_PREFIX) + 1));
@@ -113,12 +114,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    if ((user_fifo = open(secure_fifo_name, O_RDONLY)) == -1)
-    {
-        perror("open");
-        exit(RC_USR_DOWN);
-    }
-
     tlv_request_t full_request;
     init_request(&full_request, operation, pid, account_id, pwd, op_delay, req_args);
 
@@ -138,8 +133,14 @@ int main(int argc, char *argv[])
 
     // Waiting for server response or timeout
 
+    if ((user_fifo = open(secure_fifo_name, O_RDONLY)) == -1)
+    {
+        perror("open");
+        exit(RC_USR_DOWN);
+    }
 
-  //  while(read (user_fifo,  ,   ) != 0     ||  FIFO_TIMEOUT_SECS  ){
+
+    //while(read (user_fifo,  ,   ) != 0     ||  FIFO_TIMEOUT_SECS  ){
 
 
 
@@ -165,11 +166,11 @@ int main(int argc, char *argv[])
         perror("close: error closing down server fifo");
         exit(RC_OTHER);
     }
-    if (close(user_fifo) != 0)
+   /* if (close(user_fifo) != 0)
     {
         perror("close: error closing down user fifo");
         exit(RC_OTHER);
-    }
+    }*/
 
     if (unlink(string_fifo_user_aux) != 0)
     {
