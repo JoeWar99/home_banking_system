@@ -8,7 +8,7 @@
 #include "../shared/utilities.h"
 
 int valid_user_account_id(int account_id) {
-    return account_id > 0 && account_id < MAX_BANK_ACCOUNTS;
+    return account_id >= 0 && account_id < MAX_BANK_ACCOUNTS;
 }
 
 int valid_pwd(char * pwd) {

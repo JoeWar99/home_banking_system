@@ -14,24 +14,17 @@
 /**
  * @brief Element of the queue, with a pointer to the next element and a pointer to the stored value
  */
-typedef struct _queue_ele {
-	struct _queue_ele *next;
-	bank_account_t *val;
-} queue_ele;
+typedef struct node {
+	struct node *next;
+	void *val;
+} node_t;
 
 /**
  * @brief Queue object
  */
 typedef struct	{
-	queue_ele *front;
-} queue;
-
-/**
- * @brief initializes the queue data structure
- *
- * @return Object of type queue
- */
-queue* init_queue();
+	node_t *front;
+} queue_t;
 
 /**
  * @brief initializes a queue node
@@ -39,7 +32,14 @@ queue* init_queue();
  * @param val Value of the new node
  * @return New element of type queue_ele
  */
-queue_ele *new_ele(bank_account_t * val);
+node_t *new_queue_node(void * val);
+
+/**
+ * @brief initializes the queue data structure
+ *
+ * @return Object of type queue
+ */
+queue_t * init_queue();
 
 /**
  * @brief checks if the queue is empty
@@ -47,15 +47,7 @@ queue_ele *new_ele(bank_account_t * val);
  * @param q queue to check if empty
  * @return Returns true if queue is empty, false otherwise
  */
-int is_queue_empty(queue *q);
-
-/**
- * @brief determines queue size
- *
- * @param q queue to check size
- * @return Returns queue size upon success and -1 otherwise
- */
-int queue_size(queue *q);
+int is_queue_empty(queue_t *q);
 
 /**
  * @brief puts a new element in the queue
@@ -64,7 +56,7 @@ int queue_size(queue *q);
  * @param val value of the new element
  * @return Return 0 upon success and -1 otherwise
  */
-int queue_push(queue *q, bank_account_t * val);
+int queue_push(queue_t *q, void * val);
 
 /**
  * @brief removes the front of the queue
@@ -72,15 +64,15 @@ int queue_push(queue *q, bank_account_t * val);
  * @param q queue to pop element from
  * @return Return 0 upon success and -1 otherwise
  */
-int queue_pop(queue *q);
+int queue_pop(queue_t *q);
 
 /**
  * @brief returns the front of the queue
  *
  * @param q queue to get element from
- * @return Char on top of queue
+ * @return void* Pointer to the value on the head of the list (NULL if it is empty) 
  */
-const bank_account_t * queue_front(queue *q);
+const void * queue_front(queue_t *q);
 
 /**
  * @brief deletes the queue data structure
@@ -88,7 +80,7 @@ const bank_account_t * queue_front(queue *q);
  * @param q queue to delete
  * @return Return 0 upon success and -1 otherwise
  */
-int del_queue(queue *q);
+int del_queue(queue_t *q);
 
 /**
  * @brief empties a queue
@@ -96,7 +88,7 @@ int del_queue(queue *q);
  * @param q queue to empty
  * @return Return 0 upon success and -1 otherwise
  */
-int empty_queue(queue *q);
+int empty_queue(queue_t *q);
 
 /** @} */
 

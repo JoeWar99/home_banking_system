@@ -16,12 +16,14 @@
 #include "../shared/crypto.h"
 #include "../shared/queue.h"
 
+#include "../user/user_parse.h"
+
 #define SHARED 0
 
 sem_t full, empty;
 pthread_mutex_t mutex_accounts_database = PTHREAD_MUTEX_INITIALIZER;
 vetor *accounts_database;
-queue *resquest_queue;
+queue_t *resquest_queue;
 
 void *balconies(void *arg)
 {
@@ -58,6 +60,12 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
+    char * pwd = argv[2];
+
+	if (!valid_pwd(pwd)) {
+        fprintf(stderr, "Password length must be between %d and %d\n", MIN_PASSWORD_LEN, MAX_PASSWORD_LEN);
+        exit(RC_OTHER);
+    }
 
 
     accounts_database = vetor_novo();
@@ -108,7 +116,7 @@ int main(int argc, char *argv[])
     // CREATE METHOD TO ADD ACCOUNTS - store in a list???
     bank_account_t admin_account = {ADMIN_ACCOUNT_ID, "hash", "salt", 0};
     gen_salt(admin_account.salt, SALT_LEN + 1, SALT_LEN);
-    gen_hash(argv[2], admin_account.salt, admin_account.hash);
+    gen_hash(pwd, admin_account.salt, admin_account.hash);
 
     vetor_insere(accounts_database, &admin_account, -1);
 
@@ -125,9 +133,23 @@ int main(int argc, char *argv[])
         if (read(secure_svr, &request, sizeof(tlv_request_t)) != 0)
         {
             printf("header :   pid : %d , account_id %d , password %s, delay %d\n", request.value.header.pid, request.value.header.account_id, request.value.header.password, request.value.header.op_delay_ms);
-            printf("transfer:  accoutn_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-            printf("create:  accoutn_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
-        }
+            switch (request.type)
+			{
+				case OP_CREATE_ACCOUNT:
+					printf("create:  accoutn_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
+					break;
+				case OP_TRANSFER:
+					printf("transfer:  accoutn_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+					break;
+				case OP_BALANCE:
+					printf("balace\n");
+					break;
+				case OP_SHUTDOWN:
+					printf("shutdown\n");
+					break;
+			}
+            
+		}
 
         // inserir na queue
         // pseudo codigo
@@ -154,13 +176,12 @@ int main(int argc, char *argv[])
 
     // Free allocated memory
 
-    if (empty_queue(resquest_queue) != 0)
+    if (del_queue(resquest_queue) != 0)
     {
-        perror("empt_queue: error emptying queue");
+        perror("del_queue: error deleting queue");
         exit(RC_OTHER);
     }
 
-    free(resquest_queue);
 
     if (vetor_free(accounts_database) != 0)
     {

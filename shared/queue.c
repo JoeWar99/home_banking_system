@@ -2,86 +2,77 @@
 
 #include <stdlib.h>
 
-queue *init_queue(){
-	queue* new = (queue *) malloc (sizeof(queue));
+/**
+ *  +------------------------+
+ *  |                        |
+ *  |      NODE FUNCT        |
+ *  |                        |
+ *  +------------------------+
+ */
+node_t *new_queue_node(void * val){
+    node_t * new = (node_t *) malloc(sizeof(node_t));
+
+    if( new == NULL ) return new;
+    new->next = NULL;
+    new->val = val;
+
+    return new;
+}
+
+/**
+ *  +------------------------+
+ *  |                        |
+ *  |      LIST FUNCT        |
+ *  |                        |
+ *  +------------------------+
+ */
+queue_t *init_queue(){
+	queue_t * new = (queue_t *) malloc (sizeof(queue_t));
 	if (new == NULL) return NULL;
 	new->front = NULL;
 	return new;
 }
 
-queue_ele *new_ele(bank_account_t * val){
-	queue_ele *new = (queue_ele *)malloc(sizeof(queue_ele));
-	if (new == NULL) return NULL;
-
-	bank_account_t  *content;
-	content = (bank_account_t *)malloc(sizeof(bank_account_t));
-	if (content == NULL) return NULL;
-
-	content->account_id = val->account_id;
-	content->balance = val->balance;
-	strcpy(content->hash, val->hash);
-	strcpy(content->salt, val->salt);
-
-	new->next = NULL;
-	new->val = content;
-
-	return new;
-}
-
-int is_queue_empty(queue *q){
+int is_queue_empty(queue_t *q){
 	if(q == NULL) return -1;
 	return (q->front == NULL);
 }
 
-int queue_size(queue *q) {
-
-	/* Check null pointer */
-	if (q == NULL) return -1;
-
-	int size = 0;
-	queue_ele *iter = q->front;
-	while(iter->next != NULL) {
-		iter=iter->next;
-		size++;
-	}
-	return size;
-}
-
-int queue_push(queue *q, bank_account_t * val){
+int queue_push(queue_t *q, void * val){
 
 	/* Check null pointer */
 	if(q == NULL)
 		return -1;
 
 	/* Create new node */
-	queue_ele *new = new_ele(val);
-	if (new == NULL) return -1;
+	node_t *new_node = new_queue_node(val);
+	if (new_node == NULL) return -1;
 
 	/* Handle when q is empty */
 	if(is_queue_empty(q)) {
-		q->front = new;
+		q->front = new_node;
 		return 0;
 	}
 
 	/* Find the front of the queue */
-	queue_ele *iter = q->front;
+	node_t *iter = q->front;
 	while(iter->next != NULL)
 		iter=iter->next;
 
 	/* Assign correct pointers */
-	iter->next = new;
-	new->next = NULL;
+	iter->next = new_node;
+	//new_node->next = NULL;
 	return 0;
 }
 
-int queue_pop(queue *q){
+int queue_pop(queue_t *q){
 
 	/* Check null pointers */
 	if (q == NULL || q->front == NULL)
 		return -1;
 
 	/* Remove the element at front */
-	queue_ele *temp = q->front;
+	node_t *temp = q->front;
 	q->front = q->front->next;
 
 	/* Free allocated memory */
@@ -90,17 +81,17 @@ int queue_pop(queue *q){
 	return 0;
 }
 
-const bank_account_t * queue_front(queue *q){
+const void * queue_front(queue_t *q){
 
 	/* Check null pointers */
 	if(q == NULL || q->front == NULL)
-		return 0;
+		return NULL;
 
 	/* Get contnet of element at front */
 	return q->front->val;
 }
 
-int del_queue(queue *q){
+int del_queue(queue_t *q){
 
 	/* Check null pointer */
     if(q == NULL) return -1;
@@ -114,7 +105,7 @@ int del_queue(queue *q){
 	return 0;
 }
 
-int empty_queue(queue *q) {
+int empty_queue(queue_t *q) {
 
 	/* Check null pointer */
 	if(q == NULL) return -1;

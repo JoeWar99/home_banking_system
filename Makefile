@@ -7,7 +7,7 @@ user: user.o user_parse.o crypto.o utilities.o
 	$(CC) user.o user_parse.o utilities.o crypto.o -o user_exe $(CFLAGS)
 
 server: server.o crypto.o utilities.o queue.o vetor.o
-	$(CC) server.o utilities.o crypto.o queue.o vetor.o -o server_exe $(CFLAGS)
+	$(CC) server.o utilities.o crypto.o queue.o vetor.o user_parse.o -o server_exe $(CFLAGS)
 
 server.o: server/server.c
 	$(CC) -c server/server.c $(CFLAGS)
