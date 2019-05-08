@@ -13,6 +13,47 @@
 #include "../shared/types.h"
 #include "user_parse.h"
 
+void init_request(tlv_request_t * full_request, int operation, int pid, int account_id, char * pwd, int op_delay, char ** req_args) {
+
+    //TODO verify req_size is okay
+    uint32_t req_size = 0;
+    req_size += sizeof(full_request->length);
+
+    full_request->type = operation;
+    req_size += sizeof(full_request->type);
+
+    req_value_t * request_value = &(full_request->value);
+
+    req_header_t * user_header = &(request_value->header);
+    user_header->pid = pid;
+    user_header->account_id = account_id;
+    strcpy(user_header->password, pwd);
+    user_header->op_delay_ms = op_delay;
+    req_size += sizeof(req_header_t);
+
+    req_create_account_t * user_create;
+    req_transfer_t * user_transfer;
+    switch (operation)
+    {
+        case OP_CREATE_ACCOUNT:
+            user_create = &(request_value->create);
+            user_create->account_id = atoi(req_args[0]);
+            user_create->balance = atoi(req_args[1]);
+            strcpy(user_create->password, req_args[2]);
+            req_size += sizeof(req_create_account_t);
+            break;
+
+        case OP_TRANSFER:
+            user_transfer = &(request_value->transfer);
+            user_transfer->account_id = atoi(req_args[0]);
+            user_transfer->amount = atoi(req_args[1]);
+            req_size += sizeof(req_transfer_t);
+            break;
+    }
+
+    full_request->length = req_size;
+}
+
 int main(int argc, char *argv[])
 {
 
@@ -23,7 +64,6 @@ int main(int argc, char *argv[])
     }
 
     int pid = getpid();
-    char string_pid[64];
     int secure_svr;
     int account_id, op_delay, operation;
 
@@ -52,15 +92,15 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-
     int user_fifo;
     char *secure_fifo_name = (char *)malloc(sizeof(char) * (strlen(USER_FIFO_PATH_PREFIX) + 1));
 
     strcpy(secure_fifo_name, USER_FIFO_PATH_PREFIX);
-    secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + 1] = '\0';
-    //printf("%s\n", secure_fifo_name);
+    secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX)] = '\0';
+
+    char string_pid[6];
     sprintf(string_pid, "%d", pid);
-    string_pid[strlen(string_pid) + 1] = '\0';
+    string_pid[strlen(string_pid)] = '\0';
 
     concat(&secure_fifo_name, string_pid, strlen(string_pid));
 
@@ -79,33 +119,8 @@ int main(int argc, char *argv[])
         exit(RC_USR_DOWN);
     }
 
-
-    // TODO use full struct
-    req_value_t request_value;
-
-    req_header_t * user_header = &request_value.header;
-    user_header->pid = pid;
-    user_header->account_id = account_id;
-    strcpy(user_header->password, pwd);
-    user_header->op_delay_ms = op_delay;
-
-    req_create_account_t * user_create;
-    req_transfer_t * user_transfer;
-    switch (operation)
-    {
-        case OP_CREATE_ACCOUNT:
-            user_create = &request_value.create;
-            user_create->account_id = atoi(req_args[0]);
-            user_create->balance = atoi(req_args[1]);
-            strcpy(user_create->password, req_args[2]);
-            break;
-
-        case OP_TRANSFER:
-            user_transfer = &request_value.transfer;
-            user_transfer->account_id = atoi(req_args[0]);
-            user_transfer->amount = atoi(req_args[1]);
-            break;
-    }
+    tlv_request_t full_request;
+    init_request(&full_request, operation, pid, account_id, pwd, op_delay, req_args);
 
     //Opening server fifo
 
@@ -115,7 +130,7 @@ int main(int argc, char *argv[])
         exit(RC_SRV_DOWN);
     }
 
-    if (write(secure_svr, &request_value, sizeof(req_value_t) * 1) != sizeof(req_value_t))
+    if (write(secure_svr, &full_request, sizeof(tlv_request_t)) != sizeof(tlv_request_t))
     {
         perror("write: error writing to server");
         exit(RC_OTHER);
