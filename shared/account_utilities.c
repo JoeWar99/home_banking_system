@@ -24,3 +24,21 @@ int authenticate(char * pwd, bank_account_t * bank_account){
 	gen_hash(pwd, bank_account->salt, hash);
 	return strcmp(hash, bank_account->hash);
 }
+
+/*int account_balance(int account_id, bank_account_t *accounts_database, int tamanho){
+
+	for(int i = 0; i< tamanho;i++){
+		if(account_id == accounts_database[i].account_id){
+			return accounts_database[i].balance;
+		}
+	}
+}
+
+int account_database_position(int account_id, bank_account_t *accounts_database, int tamanho){
+	for(int i = 0; i< tamanho;i++){
+		if(account_id == accounts_database[i].account_id){
+			return i;
+		}
+	}
+}*/
+

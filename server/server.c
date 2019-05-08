@@ -22,25 +22,92 @@
 sem_t full, empty;
 pthread_mutex_t mutex_accounts_database = PTHREAD_MUTEX_INITIALIZER;
 /* Max Bank Account number + 1 (admin) */
-bank_account_t * accounts_database[MAX_BANK_ACCOUNTS + 1];
+bank_account_t *accounts_database[MAX_BANK_ACCOUNTS + 1];
 queue_t *resquest_queue;
 
 void *balconies(void *arg)
 {
-  // pseudo codigo
 
-  /*Process Consumer;
-    ...
-    Repeat
-    ...
-    Wait(Full);
-    Wait(Mutex);
-    Item=Take();
-    Signal(Mutex);
-    Signal(Empty);
-    Consume(Item);
-    ...
-    Until ...;*/
+    sem_wait(&full);
+    pthread_mutex_lock(&mutex_accounts_database);
+
+    tlv_request_t *first_request = (tlv_request_t *)queue_front(resquest_queue);
+    if (first_request == NULL)
+    {
+        perror("queue_front: error getting first queue element");
+        exit(RC_OTHER);
+    }
+
+    if (queue_pop(resquest_queue) != 0)
+    {
+        perror("queue_pop: error removing first queue element");
+        exit(RC_OTHER);
+    }
+
+    int balance = accounts_database[first_request->value.header.account_id]->balance;
+
+    tlv_reply_t *request_reply = (tlv_reply_t *)malloc(sizeof(tlv_reply_t));
+    int ret;
+    if ((ret = is_valid_request(first_request, accounts_database)) == 0)
+    {
+        printf("Valid request. Return: %d\n", ret);
+
+        switch (first_request->type)
+        {
+        case OP_BALANCE:
+            request_reply->value.balance.balance = balance;
+            break;
+
+        case OP_TRANSFER:
+            accounts_database[first_request->value.header.account_id]->balance = balance - first_request->value.transfer.amount;
+            accounts_database[first_request->value.transfer.account_id]->balance =  accounts_database[first_request->value.transfer.account_id]->balance + first_request->value.transfer.amount;
+            request_reply->value.transfer.balance =  accounts_database[first_request->value.header.account_id]->balance;
+            break;
+        }
+    }
+    else
+    {
+        printf("Invalid request. Return: %d\n", ret);
+    }
+
+    pthread_mutex_unlock(&mutex_accounts_database);
+    sem_post(&empty);
+
+    int user_fifo;
+
+    request_reply->type = first_request->type;
+    request_reply->value.header.account_id = first_request->value.header.account_id;
+    request_reply->value.header.ret_code = ret;
+
+     char *secure_fifo_name = (char *)malloc(sizeof(char) * (strlen(USER_FIFO_PATH_PREFIX) + 1));
+
+    strcpy(secure_fifo_name, USER_FIFO_PATH_PREFIX);
+    secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX)] = '\0';
+
+    char *string_pid = (char*) malloc(sizeof(char)*6);
+    sprintf(string_pid, "%d", first_request->value.header.pid);
+    string_pid[strlen(string_pid)] = '\0';
+
+    concat(&secure_fifo_name, string_pid, strlen(string_pid));
+
+
+    if ((user_fifo = open(secure_fifo_name, O_RDONLY)) == -1)
+    {
+        perror("open");
+        exit(RC_USR_DOWN);
+    }
+
+
+    if(write(user_fifo, &request_reply, sizeof(tlv_reply_t))!=sizeof(tlv_reply_t)){
+        perror("write: error writing to user fifo");
+        exit(RC_OTHER);
+    }
+
+    free(request_reply);
+    free(string_pid);
+    free(secure_fifo_name);
+    free(request_reply);
+    free(first_request);
 }
 
 int main(int argc, char *argv[])
@@ -60,34 +127,33 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-    char * pwd = argv[2];
+    char *pwd = argv[2];
 
-	if (!valid_pwd(pwd)) {
+    if (!valid_pwd(pwd))
+    {
         fprintf(stderr, "Password length must be between %d and %d\n", MIN_PASSWORD_LEN, MAX_PASSWORD_LEN);
         exit(RC_OTHER);
     }
 
-
-    if((resquest_queue = init_queue()) == NULL){
+    if ((resquest_queue = init_queue()) == NULL)
+    {
         perror("init_queue: error initialing the queue");
         exit(RC_OTHER);
     }
 
     int n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
-    //   INITIALIZING SEMAPHORES , PARA DEPOIS  QUANDO ESTIVEREMOS A TRATAR DA SINCRONIZAÇAO
-
-    /* if (sem_init(&full, SHARED, 0) != 0)
+    if (sem_init(&full, SHARED, 0) != 0)
     {
         perror("sem_init: erro initializing semaphore");
         exit(RC_OTHER);
     }
-    
-    if (sem_init(&empty, SHARED, n_threads_console) != 0)
+
+    if (sem_init(&empty, SHARED, n_threads) != 0)
     {
         perror("sem_init: erro initializing semaphore empty");
         exit(RC_OTHER);
-    }*/
+    }
 
     int id;
     pthread_t thread_id[n_threads];
@@ -105,7 +171,6 @@ int main(int argc, char *argv[])
 
     int secure_svr;
 
-
     if (mkfifo(SERVER_FIFO_PATH, 0660) < 0)
     {
         if (errno != EEXIST)
@@ -120,7 +185,7 @@ int main(int argc, char *argv[])
     gen_salt(admin_account.salt, SALT_LEN + 1, SALT_LEN);
     gen_hash(pwd, admin_account.salt, admin_account.hash);
 
-	accounts_database[admin_account.account_id] = &admin_account;
+    accounts_database[admin_account.account_id] = &admin_account;
 
     if ((secure_svr = open(SERVER_FIFO_PATH, O_RDWR)) == -1)
     {
@@ -134,75 +199,41 @@ int main(int argc, char *argv[])
     {
         if (read(secure_svr, &request, sizeof(tlv_request_t)) != 0)
         {
+
             printf("header :   pid : %d , account_id %d , password %s, delay %d\n", request.value.header.pid, request.value.header.account_id, request.value.header.password, request.value.header.op_delay_ms);
             switch (request.type)
-			{
-				case OP_CREATE_ACCOUNT:
-					printf("create:  accoutn_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
-					break;
-				case OP_TRANSFER:
-					printf("transfer:  accoutn_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-					break;
-				case OP_BALANCE:
-					printf("balace\n");
-					break;
-				case OP_SHUTDOWN:
-					printf("shutdown\n");
-					break;
-			}
+            {
+            case OP_CREATE_ACCOUNT:
+                printf("create:  accoutn_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
+                break;
+            case OP_TRANSFER:
+                printf("transfer:  accoutn_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+                break;
+            case OP_BALANCE:
+                printf("balace\n");
+                break;
+            case OP_SHUTDOWN:
+                printf("shutdown\n");
+                if (fchmod(secure_svr, 0444) != 0)
+                {
+                    perror("fchmod: error altering server fifo permissions");
+                    exit(RC_OTHER);
+                }
+                break;
+            }
 
-			if(queue_push(resquest_queue, &request) != 0){
-				perror("queue_push: error pushing request to queue");
-				exit(RC_OTHER);
-			}
-            
-		}
+            sem_wait(&empty);
+            pthread_mutex_lock(&mutex_accounts_database);
 
-		// TODO: por num thread
-		/**
-		 * Passos:
-		 * 	1) Receber pedido
-		 *  2) Validar pedido
-		 * 	3) Se válido executar pedido
-		 * 	4) Responder ao cliente
-		 */
-		tlv_request_t * first_request = (tlv_request_t * )queue_front(resquest_queue);
-		if(first_request == NULL){
-			perror("queue_front: error getting first queue element");
-        	exit(RC_OTHER);
-		}
+            if (queue_push(resquest_queue, &request) != 0)
+            {
+                perror("queue_push: error pushing request to queue");
+                exit(RC_OTHER);
+            }
 
-		if(queue_pop(resquest_queue) != 0){
-			perror("queue_pop: error removing first queue element");
-        	exit(RC_OTHER);
-		}
-
-		int ret;
-		if((ret = is_valid_request(first_request, accounts_database)) == 0)
-			printf("Valid request. Return: %d\n", ret);
-		else
-			printf("Invalid request. Return: %d\n", ret);
-
-        // pseudo codigo
-
-        /*   Process Producer;
-        ...
-        Repeat
-        ...
-        Produce(Item);
-        Wait(Empty);
-        Wait(Mutex);
-        Append(Item);
-        Signal(Mutex);
-        Signal(Full);
-        ...
-        Until ...;*/
-    }
-
-    if (fchmod(secure_svr, 0444) != 0)
-    {
-        perror("fchmod: error altering server fifo permissions");
-        exit(RC_OTHER);
+            pthread_mutex_unlock(&mutex_accounts_database);
+            sem_post(&full);
+        }
     }
 
     // Free allocated memory
@@ -213,7 +244,7 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-	// TODO: fazer free do array
+    // TODO: fazer free do array
 
     if (close(secure_svr) != 0)
     {

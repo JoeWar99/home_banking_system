@@ -140,8 +140,13 @@ int main(int argc, char *argv[])
         exit(RC_USR_DOWN);
     }
 
-
-    //while(read (user_fifo,  ,   ) != 0     ||  FIFO_TIMEOUT_SECS  ){
+    tlv_reply_t request_reply;
+  
+    while(1){
+        if(read (user_fifo,  &request_reply,   sizeof(tlv_reply_t)) != 0){
+            
+        }
+    }
 
 
 

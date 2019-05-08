@@ -28,69 +28,69 @@ static int is_valid_create_request(req_value_t request_value, bank_account_t * a
 	// TODO: escolher se primeiro testar login correto ou op_noallowed
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
-		return LOGIN_FAIL;
+		return RC_LOGIN_FAIL;
 
 	/* Testing if it is a admin request */
 	if(request_value.header.account_id != 0)
-		return OP_NALLOW;
+		return RC_OP_NALLOW;
 
 	/* Verify if account already exists */	
 	if(accounts_database[request_value.create.account_id] != NULL)
-		return ID_IN_USE;
+		return RC_ID_IN_USE;
 
 	/* Parameter verification done in user_parse */
 	
-	return OK;
+	return RC_OK;
 }
 
 static int is_valid_transfer_request(req_value_t request_value, bank_account_t * accounts_database[]){
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
-		return LOGIN_FAIL;
+		return RC_LOGIN_FAIL;
 
 	/* Return OP_NALLOW if the request is made by the admin */
 	if(request_value.header.account_id == 0)
-		return OP_NALLOW;
+		return RC_OP_NALLOW;
 
 	/* Verify if destination id exists */
 	if(accounts_database[request_value.transfer.account_id] == NULL)
-		return ID_NOT_FOUND;
+		return RC_ID_NOT_FOUND;
 
 	/* Verifies if both origin and destin account have the same id */
 	if(request_value.header.account_id == request_value.transfer.account_id)
-		return SAME_ID;
+		return RC_SAME_ID;
 	
 	/* Verifies if account has enough funds */
 	if(accounts_database[request_value.header.account_id]->balance < request_value.transfer.amount)
-		return NO_FUNDS;
+		return RC_NO_FUNDS;
 
 	/* Verify if the final amount is too large */
 	if(accounts_database[request_value.transfer.account_id]->balance + request_value.transfer.amount > MAX_BALANCE)
-		return TOO_HIGH;
+		return RC_TOO_HIGH;
 
-	return OK;
+	return RC_OK;
 }
 
 static int is_valid_balance_request(req_value_t request_value, bank_account_t * accounts_database[]){
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
-		return LOGIN_FAIL;
+		return RC_LOGIN_FAIL;
 
 	/* Return OP_NALLOW if the request is made by the admin */
 	if(request_value.header.account_id == 0)
-		return OP_NALLOW;
+		return RC_OP_NALLOW;
 
-	return OK;
+	return RC_OK;
 }
 
 static int is_valid_shutdown_request(req_value_t request_value, bank_account_t * accounts_database[]){
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
-		return LOGIN_FAIL;
+		return RC_LOGIN_FAIL;
 
 	/* Return OP_NALLOW if the request is made a client */
 	if(request_value.header.account_id != 0)
-		return OP_NALLOW;
+		return RC_OP_NALLOW;
 
-	return OK;
+	return RC_OK;
 }
