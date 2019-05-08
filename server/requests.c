@@ -1,13 +1,14 @@
 #include "requests.h"
 #include "../shared/constants.h"
+#include "../shared/account_utilities.h"
 
 static int is_valid_create_request(req_value_t request_value, bank_account_t * accounts_database[]);
 
 static int is_valid_transfer_request(req_value_t request_value, bank_account_t * accounts_database[]);
 
-static int is_valid_balance_request(req_value_t request_value);
+static int is_valid_balance_request(req_value_t request_value, bank_account_t * accounts_database[]);
 
-static int is_valid_shutdown_request(req_value_t request_value);
+static int is_valid_shutdown_request(req_value_t request_value, bank_account_t * accounts_database[]);
 
 int is_valid_request(tlv_request_t * request, bank_account_t * accounts_database[]){
 	switch (request->type)
@@ -17,15 +18,17 @@ int is_valid_request(tlv_request_t * request, bank_account_t * accounts_database
 		case OP_TRANSFER:
 			return is_valid_transfer_request(request->value, accounts_database);
 		case OP_BALANCE:
-			return is_valid_balance_request(request->value);
+			return is_valid_balance_request(request->value, accounts_database);
 		case OP_SHUTDOWN:
-			return is_valid_shutdown_request(request->value);
+			return is_valid_shutdown_request(request->value, accounts_database);
 	}
 }
 
 static int is_valid_create_request(req_value_t request_value, bank_account_t * accounts_database[]){
 	// TODO: escolher se primeiro testar login correto ou op_noallowed
-	// TODO: Testar login
+	/* Verify password */
+	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
+		return LOGIN_FAIL;
 
 	/* Testing if it is a admin request */
 	if(request_value.header.account_id != 0)
@@ -41,7 +44,9 @@ static int is_valid_create_request(req_value_t request_value, bank_account_t * a
 }
 
 static int is_valid_transfer_request(req_value_t request_value, bank_account_t * accounts_database[]){
-	// TODO: Testar login
+	/* Verify password */
+	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
+		return LOGIN_FAIL;
 
 	/* Return OP_NALLOW if the request is made by the admin */
 	if(request_value.header.account_id == 0)
@@ -66,8 +71,10 @@ static int is_valid_transfer_request(req_value_t request_value, bank_account_t *
 	return OK;
 }
 
-static int is_valid_balance_request(req_value_t request_value){
-	// TODO: Testar login
+static int is_valid_balance_request(req_value_t request_value, bank_account_t * accounts_database[]){
+	/* Verify password */
+	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
+		return LOGIN_FAIL;
 
 	/* Return OP_NALLOW if the request is made by the admin */
 	if(request_value.header.account_id == 0)
@@ -76,8 +83,10 @@ static int is_valid_balance_request(req_value_t request_value){
 	return OK;
 }
 
-static int is_valid_shutdown_request(req_value_t request_value){
-	// TODO: Testar login
+static int is_valid_shutdown_request(req_value_t request_value, bank_account_t * accounts_database[]){
+	/* Verify password */
+	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
+		return LOGIN_FAIL;
 
 	/* Return OP_NALLOW if the request is made a client */
 	if(request_value.header.account_id != 0)

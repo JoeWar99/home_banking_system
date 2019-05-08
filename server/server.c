@@ -14,8 +14,7 @@
 #include "../shared/types.h"
 #include "../shared/crypto.h"
 #include "../shared/queue.h"
-
-#include "../user/user_parse.h"
+#include "../shared/account_utilities.h"
 
 #define SHARED 0
 

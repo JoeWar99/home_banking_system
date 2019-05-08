@@ -3,9 +3,6 @@
 #include <string.h>
 #include <stdint.h>
 
-#include "../user/user_parse.h"
-
-
 #include "utilities.h"
 
 void concat(char *str1[], char *str2, size_t n)

@@ -6,18 +6,7 @@
 #include "../shared/constants.h"
 #include "../shared/types.h"
 #include "../shared/utilities.h"
-
-int valid_account_id(int account_id){
-	return account_id >= 0 && account_id < MAX_BANK_ACCOUNTS;
-}
-
-int valid_user_account_id(int account_id) {
-	return valid_account_id(account_id) && account_id != 0;
-}
-
-int valid_pwd(char * pwd) {
-    return strlen(pwd) >= MIN_PASSWORD_LEN && strlen(pwd) <= MAX_PASSWORD_LEN;
-}
+#include "../shared/account_utilities.h"
 
 int valid_balance(long unsigned int balance) {
     return balance >= MIN_BALANCE && balance <= MAX_BALANCE;
