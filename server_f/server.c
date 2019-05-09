@@ -25,12 +25,12 @@
 sem_t full, empty;
 pthread_mutex_t mutex_accounts_database = PTHREAD_MUTEX_INITIALIZER;
 /* Max Bank Account number + 1 (admin) */
-bank_account_t * accounts_database[MAX_BANK_ACCOUNTS + 1];
+bank_account_t *accounts_database[MAX_BANK_ACCOUNTS + 1];
 queue_t *request_queue;
 
 void *balconies(void *arg)
 {
-/*
+    /*
     sem_wait(&full);
     pthread_mutex_lock(&mutex_accounts_database);
 
@@ -125,6 +125,8 @@ void *balconies(void *arg)
 int main(int argc, char *argv[])
 {
 
+    printf("sizeof (op type %ld\n", sizeof(op_type_t));
+
     if (argc != 3)
     {
         fprintf(stderr, "Usage: %s <n_threads> <admin_pwd>\n", argv[0]);
@@ -179,7 +181,7 @@ int main(int argc, char *argv[])
         }
     }
 
-	int id;
+    int id;
     pthread_t thread_id[n_threads];
 
     for (int i = 0; i < n_threads; i++)
@@ -191,26 +193,29 @@ int main(int argc, char *argv[])
         }
     }
 
-	/* Allocate accounts_database */
-	for(uint32_t i = 0; i < MAX_BANK_ACCOUNTS + 1; i++) {
-		accounts_database[i] = (bank_account_t *)malloc(sizeof(bank_account_t));
+    /* Allocate accounts_database */
+    for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS + 1; i++)
+    {
+        accounts_database[i] = (bank_account_t *)malloc(sizeof(bank_account_t));
         accounts_database[i]->account_id = EMPTY_ACCOUNT_ID;
     }
 
     // CREATE METHOD TO ADD ACCOUNTS - store in a list???
     //bank_account_t admin_account = {ADMIN_ACCOUNT_ID, "", "", 0};
-	// bank_account_t * admin_account = (bank_account_t *) malloc(sizeof(bank_account_t));
-	// if(admin_account == NULL){
-	// 	printf("malloc: failed to allocate space to admin_account\n");
-	// 	exit(RC_OTHER);
-	// }
+    // bank_account_t * admin_account = (bank_account_t *) malloc(sizeof(bank_account_t));
+    // if(admin_account == NULL){
+    // 	printf("malloc: failed to allocate space to admin_account\n");
+    // 	exit(RC_OTHER);
+    // }
 
-	int ret;
-	if((ret = create_account(pwd, ADMIN_ACCOUNT_ID, 0, accounts_database)) != 0){
-		fprintf(stderr, "create_account: failed to create ADMIN_ACCOUNT. Error: %d\n", ret);
+    int ret;
+
+    if ((ret = create_account(pwd, ADMIN_ACCOUNT_ID, 0, accounts_database)) != 0)
+    {
+        fprintf(stderr, "create_account: failed to create ADMIN_ACCOUNT. Error: %d\n", ret);
         exit(RC_OTHER);
-	}
-	
+    }
+
     // accounts_database[admin_account->account_id] = admin_account;
 
     if ((secure_svr = open(SERVER_FIFO_PATH, O_RDWR)) == -1)
@@ -223,136 +228,178 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-        if (read(secure_svr, &request, sizeof(tlv_request_t)) != 0)
+        if (read(secure_svr, &request.type, sizeof(op_type_t)) != 0)
         {
-
-            // printf("header :   pid : %d , account_id %d , password %s, delay %d\n", request.value.header.pid, request.value.header.account_id, request.value.header.password, request.value.header.op_delay_ms);
-            // switch (request.type)
-            // {
-            // case OP_CREATE_ACCOUNT:
-            //     printf("create:  account_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
-            //     break;
-            // case OP_TRANSFER:
-            //     printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-            //     break;
-            // case OP_BALANCE:
-            //     printf("balace\n");
-            //     break;
-            // case OP_SHUTDOWN:
-            //     printf("shutdown\n");
-            //     break;
-            // }
-
-			
-            // sem_wait(&empty);
-            // pthread_mutex_lock(&mutex_accounts_database);
-
-            if (queue_push(request_queue, &request) != 0)
+            while (1)
             {
-                fprintf(stderr, "queue_push: error pushing request to queue\n");
-                exit(RC_OTHER);
+                if (read(secure_svr, &request.length, sizeof(uint32_t)) != 0)
+                {
+                    while (1)
+                    {
+                        if (read(secure_svr, &request.value, request.length) != 0)
+                        {
+                            //printf("consegui chear aqui agora ver se a informação está correta\n");
+
+                             printf("header :   pid : %d , account_id %d , password %s, delay %d\n", request.value.header.pid, request.value.header.account_id, request.value.header.password, request.value.header.op_delay_ms);
+                             switch (request.type)
+                             {
+                             case OP_CREATE_ACCOUNT:
+                                 printf("create:  account_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
+                                 break;
+                             case OP_TRANSFER:
+                                 printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+                                 break;
+                             case OP_BALANCE:
+                                 printf("balace\n");
+                                 break;
+                             case OP_SHUTDOWN:
+                             printf("shutdown\n");
+                                 break;
+                             }
+
+                            // sem_wait(&empty);
+                            // pthread_mutex_lock(&mutex_accounts_database);
+
+                            if (queue_push(request_queue, &request) != 0)
+                            {
+                                fprintf(stderr, "queue_push: error pushing request to queue\n");
+                                exit(RC_OTHER);
+                            }
+
+                            // pthread_mutex_unlock(&mutex_accounts_database);
+                            // sem_post(&full);
+
+                            /*
+			                * Passos:
+			                * 	1) Receber pedido
+			                *  2) Validar pedido
+			                * 	3) Se válido executar pedido
+			                * 	4) Responder ao cliente
+			                */
+                            tlv_request_t *first_request = (tlv_request_t *)queue_front(request_queue);
+                            if (first_request == NULL)
+                            {
+                                fprintf(stderr, "queue_front: error getting first queue element\n");
+                                exit(RC_OTHER);
+                            }
+
+                            if (queue_pop(request_queue) != 0)
+                            {
+                                fprintf(stderr, "queue_pop: error removing first queue element\n");
+                                exit(RC_OTHER);
+                            }
+
+                            // TODO: change to TID later
+                            if (logRequest(STDOUT_FILENO, 6969, first_request) < 0)
+                            {
+                                fprintf(stderr, "logRequest: error writing request to stdout\n");
+                                exit(RC_OTHER);
+                            }
+
+                            if ((ret = is_valid_request(first_request, accounts_database)) == 0)
+                            {
+                                // printf("Valid request. Return: %d\n", ret);
+                                switch (first_request->type)
+                                {
+                                case OP_CREATE_ACCOUNT:
+                                    if (create_request(first_request->value, accounts_database) != 0)
+                                    {
+                                        fprintf(stderr, "create_request: failed to create account.\n");
+                                        exit(RC_OTHER);
+                                    }
+                                    break;
+                                case OP_TRANSFER:
+                                    // printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+                                    transfer_request(first_request->value, accounts_database);
+                                    break;
+                                case OP_BALANCE:
+                                    // printf("balance\n");
+                                    break;
+                                case OP_SHUTDOWN:
+                                    // printf("shutdown\n");
+                                    if (fchmod(secure_svr, 0444) != 0)
+                                    {
+                                        perror("fchmod: error altering server fifo permissions");
+                                        exit(RC_OTHER);
+                                    }
+                                    break;
+                                }
+                            }
+                            // else
+                            // 	printf("Invalid request. Return: %d\n", ret);
+
+                            char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
+                            init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
+
+                            int user_fifo;
+                            if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
+                            {
+                                perror("secure_fifo_name");
+                                exit(RC_USR_DOWN);
+                            }
+
+                            tlv_reply_t request_reply;
+                            init_reply(&request_reply, first_request, ret, accounts_database);
+
+                            // TODO: change to TID later
+                            if (logReply(STDOUT_FILENO, 6969, &request_reply) < 0)
+                            {
+                                fprintf(stderr, "logRequest: error writing reply to stdout\n");
+                                exit(RC_OTHER);
+                            }
+
+                         /*   if (write(user_fifo, &request_reply, sizeof(tlv_reply_t)) != sizeof(tlv_reply_t))
+                            {
+                                perror("error writing to user fifo");
+                                exit(RC_OTHER);
+                            }*/
+                            
+                            
+                            if (write(user_fifo, &request_reply.type, sizeof(op_type_t)) == sizeof(op_type_t))
+                            {
+                                if (write(user_fifo, &request_reply.length, sizeof(uint32_t)) == sizeof(uint32_t))
+                                {
+                                    if (write(user_fifo, &request_reply.value, request_reply.length) != request_reply.length)
+                                    {
+                                        perror("write: error writing to user");
+                                        exit(RC_OTHER);
+                                    }
+                                }
+                                else
+                                {
+                                    perror("write: error writing to user");
+                                    exit(RC_OTHER);
+                                }
+                            }
+                            else
+                            {
+                                perror("write: error writing to user");
+                                exit(RC_OTHER);
+                            }
+
+                            if (close(user_fifo) != 0)
+                            {
+                                perror("error closing down server fifo");
+                                exit(RC_OTHER);
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
             }
-
-            // pthread_mutex_unlock(&mutex_accounts_database);
-            // sem_post(&full);
-
-			/**
-			 * Passos:
-			 * 	1) Receber pedido
-			 *  2) Validar pedido
-			 * 	3) Se válido executar pedido
-			 * 	4) Responder ao cliente
-			 */
-			tlv_request_t * first_request = (tlv_request_t * )queue_front(request_queue);
-			if(first_request == NULL){
-				fprintf(stderr,"queue_front: error getting first queue element\n");
-				exit(RC_OTHER);
-			}
-
-			if(queue_pop(request_queue) != 0){
-				fprintf(stderr,"queue_pop: error removing first queue element\n");
-				exit(RC_OTHER);
-			}
-
-			// TODO: change to TID later
-			if(logRequest(STDOUT_FILENO, 6969, first_request) < 0){
-				fprintf(stderr,"logRequest: error writing request to stdout\n");
-				exit(RC_OTHER);
-			}
-
-
-			if((ret = is_valid_request(first_request, accounts_database)) == 0){
-				// printf("Valid request. Return: %d\n", ret);
-				switch (first_request->type)
-				{
-				case OP_CREATE_ACCOUNT:
-					if(create_request(first_request->value, accounts_database) != 0){
-						fprintf(stderr, "create_request: failed to create account.\n");
-						exit(RC_OTHER);
-					}
-					break;
-				case OP_TRANSFER:
-					// printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-					transfer_request(first_request->value, accounts_database);
-					break;
-				case OP_BALANCE:
-					// printf("balance\n");
-					break;
-				case OP_SHUTDOWN:
-					// printf("shutdown\n");
-					if (fchmod(secure_svr, 0444) != 0)
-					{
-						perror("fchmod: error altering server fifo permissions");
-						exit(RC_OTHER);
-					}
-					break;
-				}
-			}
-			// else
-			// 	printf("Invalid request. Return: %d\n", ret);
-			
-            char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
-			init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
-
-			int user_fifo;
-			if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
-			{
-				perror("secure_fifo_name");
-				exit(RC_USR_DOWN);
-			}
-
-			tlv_reply_t request_reply;
-			init_reply(&request_reply, first_request, ret, accounts_database);
-
-			// TODO: change to TID later
-			if(logReply(STDOUT_FILENO, 6969, &request_reply) < 0){
-				fprintf(stderr,"logRequest: error writing reply to stdout\n");
-				exit(RC_OTHER);
-			}
-
-
-			if(write(user_fifo, &request_reply, sizeof(tlv_reply_t)) != sizeof(tlv_reply_t)){
-				perror("error writing to user fifo");
-				exit(RC_OTHER);
-			}
-
-			if (close(user_fifo) != 0)
-			{
-				perror("error closing down server fifo");
-				exit(RC_OTHER);
-			}
         }
     }
 
     // Free allocated memory
     if (del_queue(request_queue) != 0)
     {
-        fprintf(stderr,"del_queue: error deleting queue\n");
+        fprintf(stderr, "del_queue: error deleting queue\n");
         exit(RC_OTHER);
     }
 
-    for(uint32_t i = 0; i < MAX_BANK_ACCOUNTS + 1; i++)
-		free(accounts_database[i]);
+    for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS + 1; i++)
+        free(accounts_database[i]);
 
     if (close(secure_svr) != 0)
     {

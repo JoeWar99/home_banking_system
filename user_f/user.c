@@ -16,7 +16,6 @@
 
 #include "../shared/sope.h"
 
-
 int main(int argc, char *argv[])
 {
 
@@ -31,14 +30,15 @@ int main(int argc, char *argv[])
     int account_id, op_delay, operation;
 
     account_id = atoi(argv[1]);
-    char * pwd = argv[2];
+    char *pwd = argv[2];
     op_delay = atoi(argv[3]);
     operation = atoi(argv[4]);
 
     char *req_args[3];
     int req_arg_count = 0;
 
-    if (!valid_args(account_id,pwd, op_delay, operation)) {
+    if (!valid_args(account_id, pwd, op_delay, operation))
+    {
         fprintf(stderr, "Invalid arguments given\n");
         exit(RC_OTHER);
     }
@@ -78,17 +78,35 @@ int main(int argc, char *argv[])
         exit(RC_SRV_DOWN);
     }
 
-	printf("length: %d\n", full_request.length);
-    if (write(secure_svr, &full_request, sizeof(tlv_request_t)) != sizeof(tlv_request_t))
+    printf("length: %d\n", full_request.length);
+    if (write(secure_svr, &full_request.type, sizeof(op_type_t)) == sizeof(op_type_t))
+    {
+        if (write(secure_svr, &full_request.length, sizeof(uint32_t)) == sizeof(uint32_t))
+        {
+            if (write(secure_svr, &full_request.value, full_request.length) != full_request.length)
+            {
+
+                perror("write: error writing to server");
+                exit(RC_OTHER);
+            }
+        }
+        else
+        {
+            perror("write: error writing to server");
+            exit(RC_OTHER);
+        }
+    }
+    else
     {
         perror("write: error writing to server");
         exit(RC_OTHER);
     }
 
-	if(logRequest(STDOUT_FILENO, pid, &full_request) < 0){
-		fprintf(stderr,"logRequest: error writing request to stdout\n");
-		exit(RC_OTHER);
-	}
+    if (logRequest(STDOUT_FILENO, pid, &full_request) < 0)
+    {
+        fprintf(stderr, "logRequest: error writing request to stdout\n");
+        exit(RC_OTHER);
+    }
 
     // Waiting for server response or timeout
 
@@ -100,32 +118,59 @@ int main(int argc, char *argv[])
     }
 
     tlv_reply_t request_reply;
-  
-    
-	if(read (user_fifo, &request_reply, sizeof(tlv_reply_t)) != 0){
-		// printf("header :   account_id %d , ret_code %d\n", request_reply.value.header.account_id, request_reply.value.header.ret_code);
-		// switch (request_reply.type)
-		// {
-		// case OP_CREATE_ACCOUNT:
-		// 	printf("create\n");
-		// 	break;
-		// case OP_TRANSFER:
-		// 	printf("transfer: balance %d\n", request_reply.value.transfer.balance);
-		// 	break;
-		// case OP_BALANCE:
-		// 	printf("balance: balance %d\n", request_reply.value.balance.balance);
-		// 	break;
-		// case OP_SHUTDOWN:
-		// 	printf("shutdown: active offices %d\n", request_reply.value.shutdown.active_offices);
-		// 	break;
-		// }
-		if(logReply(STDOUT_FILENO, pid, &request_reply) < 0){
-			fprintf(stderr,"logRequest: error writing reply to stdout\n");
-			exit(RC_OTHER);
-		}
-		
-	}
-    
+
+    while (1)
+    {
+        if (read(user_fifo, &request_reply.type, sizeof(op_type_t)) != 0)
+        {
+            while (1)
+            {
+                if (read(user_fifo, &request_reply.length, sizeof(uint32_t)) != 0)
+                {
+                    while (1)
+                    {
+                        if (read(user_fifo, &request_reply.value, request_reply.length) != 0)
+                        {
+
+                            if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
+                            {
+                                fprintf(stderr, "logRequest: error writing reply to stdout\n");
+                                exit(RC_OTHER);
+                            }
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+            break;
+        }
+    }
+
+    /* if (read(user_fifo, &request_reply, sizeof(tlv_reply_t)) != 0)
+    {
+        // printf("header :   account_id %d , ret_code %d\n", request_reply.value.header.account_id, request_reply.value.header.ret_code);
+        // switch (request_reply.type)
+        // {
+        // case OP_CREATE_ACCOUNT:
+        // 	printf("create\n");
+        // 	break;
+        // case OP_TRANSFER:
+        // 	printf("transfer: balance %d\n", request_reply.value.transfer.balance);
+        // 	break;
+        // case OP_BALANCE:
+        // 	printf("balance: balance %d\n", request_reply.value.balance.balance);
+        // 	break;
+        // case OP_SHUTDOWN:
+        // 	printf("shutdown: active offices %d\n", request_reply.value.shutdown.active_offices);
+        // 	break;
+        // }
+        if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
+        {
+            fprintf(stderr, "logRequest: error writing reply to stdout\n");
+            exit(RC_OTHER);
+        }
+    }*/
 
     // Free alocated memory
     for (int i = 0; i < req_arg_count; i++)
