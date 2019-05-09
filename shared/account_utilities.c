@@ -1,7 +1,8 @@
 #include "account_utilities.h"
 
 #include <string.h>
-
+#include <stdio.h>
+#include <stdlib.h>
 
 #include "constants.h"
 #include "utilities.h"
@@ -20,25 +21,17 @@ int valid_pwd(char * pwd) {
 }
 
 int authenticate(char * pwd, bank_account_t * bank_account){
-	char hash[strlen(bank_account->hash)];
+	char * hash = (char*) malloc(strlen(bank_account->hash));
 	gen_hash(pwd, bank_account->salt, hash);
 	return strcmp(hash, bank_account->hash);
 }
 
-/*int account_balance(int account_id, bank_account_t *accounts_database, int tamanho){
-
-	for(int i = 0; i< tamanho;i++){
-		if(account_id == accounts_database[i].account_id){
-			return accounts_database[i].balance;
-		}
-	}
+int create_account(char * pwd, uint32_t account_id, uint32_t balance, bank_account_t * accounts_database[]){
+	if(gen_salt(accounts_database[account_id]->salt, SALT_LEN + 1, SALT_LEN) != 0)
+		return -1;
+    if(gen_hash(pwd, accounts_database[account_id]->salt, accounts_database[account_id]->hash) != 0)
+		return -2;
+	accounts_database[account_id]->account_id = account_id;
+	accounts_database[account_id]->balance = balance;
+	return 0;
 }
-
-int account_database_position(int account_id, bank_account_t *accounts_database, int tamanho){
-	for(int i = 0; i< tamanho;i++){
-		if(account_id == accounts_database[i].account_id){
-			return i;
-		}
-	}
-}*/
-

@@ -1,4 +1,5 @@
 #include "requests.h"
+#include <stdio.h>
 #include "../shared/constants.h"
 #include "../shared/account_utilities.h"
 
@@ -11,6 +12,7 @@ static int is_valid_balance_request(req_value_t request_value, bank_account_t * 
 static int is_valid_shutdown_request(req_value_t request_value, bank_account_t * accounts_database[]);
 
 int is_valid_request(tlv_request_t * request, bank_account_t * accounts_database[]){
+
 	switch (request->type)
 	{
 		case OP_CREATE_ACCOUNT:
@@ -24,18 +26,30 @@ int is_valid_request(tlv_request_t * request, bank_account_t * accounts_database
 	}
 }
 
-static int is_valid_create_request(req_value_t request_value, bank_account_t * accounts_database[]){
-	// TODO: escolher se primeiro testar login correto ou op_noallowed
-	/* Verify password */
-	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
-		return RC_LOGIN_FAIL;
+int create_request(req_value_t request_value, bank_account_t * accounts_database[]){
+	if(create_account(request_value.create.password, request_value.create.account_id, request_value.create.balance, accounts_database) != 0)
+		return -1;
+	return 0;
+}
 
+int transfer_request(req_value_t request_value, bank_account_t * accounts_database[]){
+	accounts_database[request_value.header.account_id]->balance -= request_value.transfer.amount;
+	accounts_database[request_value.transfer.account_id]->balance += request_value.transfer.amount;
+	return 0;
+}
+
+static int is_valid_create_request(req_value_t request_value, bank_account_t * accounts_database[]){
+	// TODO: escolher se primeiro testar login correto ou op_noallowed. Discutir isto
 	/* Testing if it is a admin request */
 	if(request_value.header.account_id != 0)
 		return RC_OP_NALLOW;
 
+	/* Verify password */
+	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
+		return RC_LOGIN_FAIL;
+
 	/* Verify if account already exists */	
-	if(accounts_database[request_value.create.account_id] != NULL)
+	if(accounts_database[request_value.create.account_id]->account_id != 0)
 		return RC_ID_IN_USE;
 
 	/* Parameter verification done in user_parse */
@@ -44,6 +58,10 @@ static int is_valid_create_request(req_value_t request_value, bank_account_t * a
 }
 
 static int is_valid_transfer_request(req_value_t request_value, bank_account_t * accounts_database[]){
+	// TODO: isto n esta 100% certo
+	if(accounts_database[request_value.header.account_id]->account_id == 0)
+		return RC_OTHER;
+
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
 		return RC_LOGIN_FAIL;
@@ -53,7 +71,7 @@ static int is_valid_transfer_request(req_value_t request_value, bank_account_t *
 		return RC_OP_NALLOW;
 
 	/* Verify if destination id exists */
-	if(accounts_database[request_value.transfer.account_id] == NULL)
+	if(accounts_database[request_value.transfer.account_id]->account_id == 0)
 		return RC_ID_NOT_FOUND;
 
 	/* Verifies if both origin and destin account have the same id */
@@ -72,6 +90,10 @@ static int is_valid_transfer_request(req_value_t request_value, bank_account_t *
 }
 
 static int is_valid_balance_request(req_value_t request_value, bank_account_t * accounts_database[]){
+	// TODO: isto n esta 100% certo
+	if(accounts_database[request_value.header.account_id]->account_id == 0)
+		return RC_OTHER;
+
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
 		return RC_LOGIN_FAIL;
@@ -84,13 +106,15 @@ static int is_valid_balance_request(req_value_t request_value, bank_account_t * 
 }
 
 static int is_valid_shutdown_request(req_value_t request_value, bank_account_t * accounts_database[]){
+	// TODO: ver mesmo que antes
+	/* Return OP_NALLOW if the request is made a client */
+	if(request_value.header.account_id != 0)
+		return RC_OP_NALLOW;
+
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
 		return RC_LOGIN_FAIL;
 
-	/* Return OP_NALLOW if the request is made a client */
-	if(request_value.header.account_id != 0)
-		return RC_OP_NALLOW;
 
 	return RC_OK;
 }

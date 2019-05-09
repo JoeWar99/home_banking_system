@@ -17,13 +17,12 @@ int gen_salt(char * buf, int buf_size, int salt_size) {
 
     if (salt_size >= buf_size) return -1;
 
-    int iters = salt_size / sizeof(int);
+    int iters = salt_size / sizeof(int) - 1;
     
     for (int i = 0; i < iters; i++) {
         sprintf(&buf[i*sizeof(int)], "%x", gen_random_int());
     }
-    buf[salt_size] = '\0';
-
+    buf[buf_size] = '\0';
     return 0;
 }
 
@@ -49,6 +48,7 @@ int gen_hash(char * pwd, char * salt, char * hash) {
         perror("pclose");
         return -1;
     }
+
 /*
     int ret = pclose(fp);
 	if (ret)

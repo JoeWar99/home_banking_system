@@ -6,14 +6,17 @@ all: user server
 user: user.o user_parse.o crypto.o utilities.o account_utilities.o
 	$(CC) user.o user_parse.o utilities.o crypto.o account_utilities.o -o user_exe $(CFLAGS)
 
-server: server.o crypto.o utilities.o queue.o requests.o account_utilities.o
-	$(CC) server.o utilities.o crypto.o queue.o requests.o account_utilities.o -o server_exe $(CFLAGS)
+server: server.o crypto.o utilities.o queue.o requests.o account_utilities.o reply.o
+	$(CC) server.o utilities.o crypto.o queue.o requests.o account_utilities.o reply.o -o server_exe $(CFLAGS)
 
 server.o: server/server.c
 	$(CC) -c server/server.c $(CFLAGS)
 
 requests.o: server/requests.c shared/account_utilities.c
 	$(CC) -c server/requests.c shared/account_utilities.c $(CFLAGS)
+
+reply.o: server/reply.c shared/utilities.c
+	$(CC) -c server/reply.c shared/utilities.c $(CFLAGS)
 
 user.o: user/user.c
 	$(CC) -c user/user.c $(CFLAGS)
