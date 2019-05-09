@@ -30,96 +30,128 @@ queue_t *request_queue;
 
 void *balconies(void *arg)
 {
-    /*
-    sem_wait(&full);
-    pthread_mutex_lock(&mutex_accounts_database);
-
-    tlv_request_t *first_request = (tlv_request_t *)queue_front(request_queue);
-    if (first_request == NULL)
-    {
-        perror("queue_front: error getting first queue element");
-        exit(RC_OTHER);
-    }
-
-    if (queue_pop(request_queue) != 0)
-    {
-        perror("queue_pop: error removing first queue element");
-        exit(RC_OTHER);
-    }
-
-    int balance = accounts_database[first_request->value.header.account_id]->balance;
-
-    tlv_reply_t *request_reply = (tlv_reply_t *)malloc(sizeof(tlv_reply_t));
+    int id_thread = *(int *)arg;
+    int pid_thread = pthread_self();
     int ret;
-    if ((ret = is_valid_request(first_request, accounts_database)) == 0)
-    {
-        printf("Valid request. Return: %d\n", ret);
+    int full_aux;
+    int empty_aux;
+    tlv_request_t *first_request;
 
-        switch (first_request->type)
+    logBankOfficeOpen(STDOUT_FILENO, id_thread, pid_thread);
+
+    while (1)
+    {
+        if (sem_getvalue(&full, &full_aux) != 0)
         {
-        case OP_BALANCE:
-            request_reply->value.balance.balance = balance;
-            break;
-
-        case OP_TRANSFER:
-            accounts_database[first_request->value.header.account_id]->balance = balance - first_request->value.transfer.amount;
-            accounts_database[first_request->value.transfer.account_id]->balance =  accounts_database[first_request->value.transfer.account_id]->balance + first_request->value.transfer.amount;
-            request_reply->value.transfer.balance =  accounts_database[first_request->value.header.account_id]->balance;
-            break;
+            perror("sem_get_value:");
+            exit(RC_OTHER);
         }
+
+        logSyncMechSem(STDOUT_FILENO, id_thread, SYNC_OP_SEM_WAIT, SYNC_ROLE_CONSUMER,0, full_aux);
+        sem_wait(&full);
+        pthread_mutex_lock(&mutex_accounts_database);
+        logSyncMech(STDOUT_FILENO, id_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_CONSUMER, 0);
+
+        /*
+		* Passos:
+		* 	1) Receber pedido
+		*  2) Validar pedido
+		* 	3) Se válido executar pedido
+		* 	4) Responder ao cliente
+    
+		*/
+        first_request = (tlv_request_t *)queue_front(request_queue);
+        if (first_request == NULL)
+        {
+            fprintf(stderr, "queue_front: error getting first queue element\n");
+            exit(RC_OTHER);
+        }
+
+        if (queue_pop(request_queue) != 0)
+        {
+            fprintf(stderr, "queue_pop: error removing first queue element\n");
+        //    exit(RC_OTHER);
+        }
+
+
+
+        pthread_mutex_unlock(&mutex_accounts_database);
+        logSyncMech(STDOUT_FILENO, id_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_CONSUMER, first_request->value.header.pid);
+
+        // TODO: change to TID later
+        if (logRequest(STDOUT_FILENO, 6969, first_request) < 0)
+        {
+            fprintf(stderr, "logRequest: error writing request to stdout\n");
+        //    exit(RC_OTHER);
+        }
+
+        if ((ret = is_valid_request(first_request, accounts_database)) == 0)
+        {
+            // printf("Valid request. Return: %d\n", ret);
+            switch (first_request->type)
+            {
+            case OP_CREATE_ACCOUNT:
+                if (create_request(first_request->value, accounts_database) != 0)
+                {
+                    fprintf(stderr, "create_request: failed to create account.\n");
+                    //   exit(RC_OTHER);
+                }
+                break;
+            case OP_TRANSFER:
+                // printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+                transfer_request(first_request->value, accounts_database);
+                break;
+            case OP_BALANCE:
+                // printf("balance\n");
+                break;
+            case OP_SHUTDOWN:
+                // printf("shutdown\n");
+                /* if (fchmod(secure_svr, 0444) != 0)
+                {
+                    perror("fchmod: error altering server fifo permissions");*/
+                //  exit(RC_OTHER);
+                break;
+            }
+        }
+
+        char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
+        init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
+
+        int user_fifo;
+        if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
+        {
+            perror("secure_fifo_name");
+            //exit(RC_USR_DOWN);
+        }
+
+        tlv_reply_t request_reply;
+        init_reply(&request_reply, first_request, ret, accounts_database);
+
+        // TODO: change to TID later
+        if (logReply(STDOUT_FILENO,id_thread, &request_reply) < 0)
+        {
+            fprintf(stderr, "logRequest: error writing reply to stdout\n");
+        }
+
+        if (write_reply(user_fifo, &request_reply) != 0)
+        {
+            fprintf(stderr, "write_reply: error writing reply to server\n");
+        }
+
+        if (close(user_fifo) != 0)
+        {
+            perror("error closing down server fifo");
+        }
+        sem_post(&empty);
+        if (sem_getvalue(&empty, &empty_aux) != 0)
+        {
+            perror("sem_get_value:");
+            exit(RC_OTHER);
+        }
+        logSyncMechSem(STDOUT_FILENO, id_thread, SYNC_OP_SEM_POST, SYNC_ROLE_CONSUMER, first_request->value.header.pid, empty_aux);
     }
-    else
-    {
-        printf("Invalid request. Return: %d\n", ret);
-    }
 
-    pthread_mutex_unlock(&mutex_accounts_database);
-    sem_post(&empty);
-
-    int user_fifo;
-
-    request_reply->type = first_request->type;
-    request_reply->value.header.account_id = first_request->value.header.account_id;
-    request_reply->value.header.ret_code = ret;
-
-     char *secure_fifo_name = (char *)malloc(sizeof(char) * (strlen(USER_FIFO_PATH_PREFIX) + 1));
-
-    strcpy(secure_fifo_name, USER_FIFO_PATH_PREFIX);
-    secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX)] = '\0';
-
-    char *string_pid = (char*) malloc(sizeof(char)*6);
-    sprintf(string_pid, "%d", first_request->value.header.pid);
-    string_pid[strlen(string_pid)] = '\0';
-
-    concat(&secure_fifo_name, string_pid, strlen(string_pid));
-
-
-    if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
-    {
-        perror("open");
-        exit(RC_USR_DOWN);
-    }
-
-
-    if(write(user_fifo, &request_reply, sizeof(tlv_reply_t))!=sizeof(tlv_reply_t)){
-        perror("write: error writing to user fifo");
-        exit(RC_OTHER);
-    }
-
-
-    if (close(user_fifo) != 0)
-    {
-        perror("close: error closing down server fifo");
-        exit(RC_OTHER);
-    }
-
-
-
-	free(string_pid);
-    free(secure_fifo_name);
-    free(request_reply);
-    free(first_request);
-	*/
+    logBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread);
 }
 
 int main(int argc, char *argv[])
@@ -155,17 +187,25 @@ int main(int argc, char *argv[])
 
     int n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
 
+    int full_aux;
+    int empty_aux;
+    int id_main_thread = 0;
+
     if (sem_init(&full, SHARED, 0) != 0)
     {
         perror("sem_init: error initializing full semaphore");
         exit(RC_OTHER);
     }
 
+    logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, id_main_thread, 0);
+
     if (sem_init(&empty, SHARED, n_threads) != 0)
     {
         perror("sem_init: error initializing empty semaphore");
         exit(RC_OTHER);
     }
+
+    logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, id_main_thread, n_threads);
 
     int secure_svr;
     srand(time(NULL));
@@ -179,12 +219,13 @@ int main(int argc, char *argv[])
         }
     }
 
-    int id;
-    pthread_t thread_id[n_threads];
+    int id[n_threads];
+    pthread_t thread_tid[n_threads];
 
     for (int i = 0; i < n_threads; i++)
     {
-        if (pthread_create(&thread_id[i], NULL, balconies, &id) != 0)
+        id[i] = i + 1;
+        if (pthread_create(&thread_tid[i], NULL, balconies, &id[i]) != 0)
         {
             perror("pthread_create: error creating thread ");
             exit(RC_OTHER);
@@ -197,14 +238,6 @@ int main(int argc, char *argv[])
         accounts_database[i] = (bank_account_t *)malloc(sizeof(bank_account_t));
         accounts_database[i]->account_id = EMPTY_ACCOUNT_ID;
     }
-
-    // CREATE METHOD TO ADD ACCOUNTS - store in a list???
-    //bank_account_t admin_account = {ADMIN_ACCOUNT_ID, "", "", 0};
-    // bank_account_t * admin_account = (bank_account_t *) malloc(sizeof(bank_account_t));
-    // if(admin_account == NULL){
-    // 	printf("malloc: failed to allocate space to admin_account\n");
-    // 	exit(RC_OTHER);
-    // }
 
     int ret;
 
@@ -226,113 +259,43 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-		if (read_request(secure_svr, &request) != 0)
-		{
-			fprintf(stderr, "read_request: error reading the request\n");
-	        break;
-		}
+        if (read_request(secure_svr, &request) != 0)
+        {
+            fprintf(stderr, "read_request: error reading the request\n");
+            break;
+        }
 
-		// sem_wait(&empty);
-		// pthread_mutex_lock(&mutex_accounts_database);
+        if (logRequest(STDOUT_FILENO, id_main_thread, &request) < 0)
+        {
+            fprintf(stderr, "logRequest: error writing request to stdout\n");
+            exit(RC_OTHER);
+        }
 
-		if (queue_push(request_queue, &request) != 0)
-		{
-			fprintf(stderr, "queue_push: error pushing request to queue\n");
-			exit(RC_OTHER);
-		}
+        if (sem_getvalue(&empty, &empty_aux) != 0)
+        {
+            perror("sem_get_value:");
+            exit(RC_OTHER);
+        }
 
-		// pthread_mutex_unlock(&mutex_accounts_database);
-		// sem_post(&full);
+        logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_WAIT, SYNC_ROLE_PRODUCER, request.value.header.pid, empty_aux);
+        sem_wait(&empty);
+        pthread_mutex_lock(&mutex_accounts_database);
+        logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_ACCOUNT, request.value.header.pid);
 
-		/*
-		* Passos:
-		* 	1) Receber pedido
-		*  2) Validar pedido
-		* 	3) Se válido executar pedido
-		* 	4) Responder ao cliente
-		*/
-		tlv_request_t *first_request = (tlv_request_t *)queue_front(request_queue);
-		if (first_request == NULL)
-		{
-			fprintf(stderr, "queue_front: error getting first queue element\n");
-			exit(RC_OTHER);
-		}
-
-		if (queue_pop(request_queue) != 0)
-		{
-			fprintf(stderr, "queue_pop: error removing first queue element\n");
-			exit(RC_OTHER);
-		}
-
-		// TODO: change to TID later
-		if (logRequest(STDOUT_FILENO, 6969, first_request) < 0)
-		{
-			fprintf(stderr, "logRequest: error writing request to stdout\n");
-			exit(RC_OTHER);
-		}
-
-		if ((ret = is_valid_request(first_request, accounts_database)) == 0)
-		{
-			// printf("Valid request. Return: %d\n", ret);
-			switch (first_request->type)
-			{
-			case OP_CREATE_ACCOUNT:
-				if (create_request(first_request->value, accounts_database) != 0)
-				{
-					fprintf(stderr, "create_request: failed to create account.\n");
-					exit(RC_OTHER);
-				}
-				break;
-			case OP_TRANSFER:
-				// printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-				transfer_request(first_request->value, accounts_database);
-				break;
-			case OP_BALANCE:
-				// printf("balance\n");
-				break;
-			case OP_SHUTDOWN:
-				// printf("shutdown\n");
-				if (fchmod(secure_svr, 0444) != 0)
-				{
-					perror("fchmod: error altering server fifo permissions");
-					exit(RC_OTHER);
-				}
-				break;
-			}
-		}
-		// else
-		// 	printf("Invalid request. Return: %d\n", ret);
-
-		char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
-		init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
-
-		int user_fifo;
-		if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
-		{
-			perror("secure_fifo_name");
-			exit(RC_USR_DOWN);
-		}
-
-		tlv_reply_t request_reply;
-		init_reply(&request_reply, first_request, ret, accounts_database);
-
-		// TODO: change to TID later
-		if (logReply(STDOUT_FILENO, 6969, &request_reply) < 0)
-		{
-			fprintf(stderr, "logRequest: error writing reply to stdout\n");
-			break;
-		}		
-		
-		if(write_reply(user_fifo, &request_reply) != 0){
-			fprintf(stderr, "write_reply: error writing reply to server\n");
-			break;
-		}
-
-		if (close(user_fifo) != 0)
-		{
-			perror("error closing down server fifo");
-			break;
-		}
+        if (queue_push(request_queue, &request) != 0)
+        {
+            fprintf(stderr, "queue_push: error pushing request to queue\n");
+            exit(RC_OTHER);
+        }
+        pthread_mutex_unlock(&mutex_accounts_database);
+        logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_ACCOUNT, request.value.header.pid);
+        sem_post(&full);
+        if (sem_getvalue(&full, &full_aux) != 0)
+        {
+            perror("sem_get_value:");
+            exit(RC_OTHER);
+        }
+        logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_POST, SYNC_ROLE_PRODUCER, request.value.header.pid, full_aux);
     }
 
     // Free allocated memory
