@@ -78,6 +78,7 @@ int main(int argc, char *argv[])
         exit(RC_SRV_DOWN);
     }
 
+	printf("length: %d\n", full_request.length);
     if (write(secure_svr, &full_request, sizeof(tlv_request_t)) != sizeof(tlv_request_t))
     {
         perror("write: error writing to server");
