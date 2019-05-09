@@ -125,8 +125,6 @@ void *balconies(void *arg)
 int main(int argc, char *argv[])
 {
 
-    printf("sizeof (op type %ld\n", sizeof(op_type_t));
-
     if (argc != 3)
     {
         fprintf(stderr, "Usage: %s <n_threads> <admin_pwd>\n", argv[0]);

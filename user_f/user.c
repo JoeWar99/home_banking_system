@@ -77,30 +77,10 @@ int main(int argc, char *argv[])
         perror("open: server is not working 404 error");
         exit(RC_SRV_DOWN);
     }
-
-    printf("length: %d\n", full_request.length);
-    if (write(secure_svr, &full_request.type, sizeof(op_type_t)) == sizeof(op_type_t))
-    {
-        if (write(secure_svr, &full_request.length, sizeof(uint32_t)) == sizeof(uint32_t))
-        {
-            if (write(secure_svr, &full_request.value, full_request.length) != full_request.length)
-            {
-
-                perror("write: error writing to server");
-                exit(RC_OTHER);
-            }
-        }
-        else
-        {
-            perror("write: error writing to server");
-            exit(RC_OTHER);
-        }
-    }
-    else
-    {
-        perror("write: error writing to server");
-        exit(RC_OTHER);
-    }
+	if(write_request(secure_svr, &full_request) != 0){
+		fprintf(stderr, "write: error writing to server\n");
+		exit(RC_OTHER);
+	}
 
     if (logRequest(STDOUT_FILENO, pid, &full_request) < 0)
     {
@@ -119,33 +99,17 @@ int main(int argc, char *argv[])
 
     tlv_reply_t request_reply;
 
-    while (1)
-    {
-        if (read(user_fifo, &request_reply.type, sizeof(op_type_t)) != 0)
-        {
-            while (1)
-            {
-                if (read(user_fifo, &request_reply.length, sizeof(uint32_t)) != 0)
-                {
-                    while (1)
-                    {
-                        if (read(user_fifo, &request_reply.value, request_reply.length) != 0)
-                        {
+	if(read_reply(user_fifo, &request_reply) != 0){
+		fprintf(stderr, "read_reply: error reading reply from fifo\n");
+		exit(RC_OTHER);
+	}
 
-                            if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
-                            {
-                                fprintf(stderr, "logRequest: error writing reply to stdout\n");
-                                exit(RC_OTHER);
-                            }
-                            break;
-                        }
-                    }
-                    break;
-                }
-            }
-            break;
-        }
-    }
+	if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
+	{
+		fprintf(stderr, "logRequest: error writing reply to stdout\n");
+		exit(RC_OTHER);
+	}
+	
 
     /* if (read(user_fifo, &request_reply, sizeof(tlv_reply_t)) != 0)
     {

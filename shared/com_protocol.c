@@ -94,3 +94,23 @@ int init_secure_fifo_name(char * fifo_name, pid_t pid){
 	fifo_name[prefix_size+WIDTH_PID] = '\0';
 	return 0;
 }
+
+int read_reply(int fd, tlv_reply_t * request_reply){
+	if (read(fd, &(request_reply->type), sizeof(op_type_t)) == 0)
+		return -1;
+	if (read(fd, &(request_reply->length), sizeof(uint32_t)) == 0)
+		return -1;
+	if (read(fd, &(request_reply->value), request_reply->length) == 0)
+		return -1;
+	return 0;
+}
+
+int write_request(int fd, tlv_request_t * request){
+	 if (write(fd, &(request->type), sizeof(op_type_t)) != sizeof(op_type_t))
+	 	return -1;
+	if (write(fd, &(request->length), sizeof(uint32_t)) != sizeof(uint32_t))
+		return -1;
+	if (write(fd, &(request->value), request->length) != request->length)
+		return -1;
+	return 0;
+}
