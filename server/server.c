@@ -15,8 +15,8 @@
 #include "../shared/crypto.h"
 #include "../shared/queue.h"
 #include "../shared/account_utilities.h"
+#include "../shared/com_protocol.h"
 #include "requests.h"
-#include "reply.h"
 
 #define SHARED 0
 
@@ -228,10 +228,10 @@ int main(int argc, char *argv[])
             switch (request.type)
             {
             case OP_CREATE_ACCOUNT:
-                printf("create:  accoutn_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
+                printf("create:  account_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
                 break;
             case OP_TRANSFER:
-                printf("transfer:  accoutn_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+                printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
                 break;
             case OP_BALANCE:
                 printf("balace\n");
@@ -307,12 +307,9 @@ int main(int argc, char *argv[])
 			}
 			else
 				printf("Invalid request. Return: %d\n", ret);
-
-			tlv_reply_t request_reply;
-			init_reply(&request_reply, first_request, ret, accounts_database);
 			
-            char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX)+1];
-			init_reply_fifo_name(secure_fifo_name, first_request->value.header.pid);
+            char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
+			init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
 
 			int user_fifo;
 			if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
@@ -320,6 +317,9 @@ int main(int argc, char *argv[])
 				perror("secure_fifo_name");
 				exit(RC_USR_DOWN);
 			}
+
+			tlv_reply_t request_reply;
+			init_reply(&request_reply, first_request, ret, accounts_database);
 
 			if(write(user_fifo, &request_reply, sizeof(tlv_reply_t))!=sizeof(tlv_reply_t)){
 				perror("error writing to user fifo");

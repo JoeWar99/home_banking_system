@@ -21,8 +21,8 @@ int valid_pwd(char * pwd) {
 }
 
 int authenticate(char * pwd, bank_account_t * bank_account){
-	if (bank_account->account_id == EMPTY_ACCOUNT_ID) return 1;
-	char * hash = (char*) malloc(strlen(bank_account->hash));
+	if (bank_account->account_id == EMPTY_ACCOUNT_ID) return RC_ID_NOT_FOUND;
+	char hash[HASH_LEN + 1];
 	gen_hash(pwd, bank_account->salt, hash);
 	int comp = strcmp(hash, bank_account->hash);
 	return comp;

@@ -49,7 +49,7 @@ static int is_valid_create_request(req_value_t request_value, bank_account_t * a
 		return RC_LOGIN_FAIL;
 
 	/* Verify if account already exists */	
-	if(accounts_database[request_value.create.account_id]->account_id != 0)
+	if(accounts_database[request_value.create.account_id]->account_id != EMPTY_ACCOUNT_ID)
 		return RC_ID_IN_USE;
 
 	/* Parameter verification done in user_parse */
@@ -68,7 +68,7 @@ static int is_valid_transfer_request(req_value_t request_value, bank_account_t *
 		return RC_OP_NALLOW;
 
 	/* Verify if destination id exists */
-	if(accounts_database[request_value.transfer.account_id]->account_id == 0)
+	if(accounts_database[request_value.transfer.account_id]->account_id == EMPTY_ACCOUNT_ID)
 		return RC_ID_NOT_FOUND;
 
 	/* Verifies if both origin and destin account have the same id */
