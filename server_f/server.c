@@ -18,6 +18,8 @@
 #include "../shared/com_protocol.h"
 #include "requests.h"
 
+#include "../shared/sope.h"
+
 #define SHARED 0
 
 sem_t full, empty;
@@ -224,27 +226,22 @@ int main(int argc, char *argv[])
         if (read(secure_svr, &request, sizeof(tlv_request_t)) != 0)
         {
 
-            printf("header :   pid : %d , account_id %d , password %s, delay %d\n", request.value.header.pid, request.value.header.account_id, request.value.header.password, request.value.header.op_delay_ms);
-            switch (request.type)
-            {
-            case OP_CREATE_ACCOUNT:
-                printf("create:  account_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
-                break;
-            case OP_TRANSFER:
-                printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-                break;
-            case OP_BALANCE:
-                printf("balace\n");
-                break;
-            case OP_SHUTDOWN:
-                printf("shutdown\n");
-                if (fchmod(secure_svr, 0444) != 0)
-                {
-                    perror("fchmod: error altering server fifo permissions");
-                    exit(RC_OTHER);
-                }
-                break;
-            }
+            // printf("header :   pid : %d , account_id %d , password %s, delay %d\n", request.value.header.pid, request.value.header.account_id, request.value.header.password, request.value.header.op_delay_ms);
+            // switch (request.type)
+            // {
+            // case OP_CREATE_ACCOUNT:
+            //     printf("create:  account_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
+            //     break;
+            // case OP_TRANSFER:
+            //     printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+            //     break;
+            // case OP_BALANCE:
+            //     printf("balace\n");
+            //     break;
+            // case OP_SHUTDOWN:
+            //     printf("shutdown\n");
+            //     break;
+            // }
 
 			
             // sem_wait(&empty);
@@ -277,9 +274,15 @@ int main(int argc, char *argv[])
 				exit(RC_OTHER);
 			}
 
+			// TODO: change to TID later
+			if(logRequest(STDOUT_FILENO, 6969, first_request) < 0){
+				fprintf(stderr,"logRequest: error writing request to stdout\n");
+				exit(RC_OTHER);
+			}
+
 
 			if((ret = is_valid_request(first_request, accounts_database)) == 0){
-				printf("Valid request. Return: %d\n", ret);
+				// printf("Valid request. Return: %d\n", ret);
 				switch (first_request->type)
 				{
 				case OP_CREATE_ACCOUNT:
@@ -289,14 +292,14 @@ int main(int argc, char *argv[])
 					}
 					break;
 				case OP_TRANSFER:
-					printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+					// printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
 					transfer_request(first_request->value, accounts_database);
 					break;
 				case OP_BALANCE:
-					printf("balance\n");
+					// printf("balance\n");
 					break;
 				case OP_SHUTDOWN:
-					printf("shutdown\n");
+					// printf("shutdown\n");
 					if (fchmod(secure_svr, 0444) != 0)
 					{
 						perror("fchmod: error altering server fifo permissions");
@@ -305,8 +308,8 @@ int main(int argc, char *argv[])
 					break;
 				}
 			}
-			else
-				printf("Invalid request. Return: %d\n", ret);
+			// else
+			// 	printf("Invalid request. Return: %d\n", ret);
 			
             char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
 			init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
@@ -321,7 +324,14 @@ int main(int argc, char *argv[])
 			tlv_reply_t request_reply;
 			init_reply(&request_reply, first_request, ret, accounts_database);
 
-			if(write(user_fifo, &request_reply, sizeof(tlv_reply_t))!=sizeof(tlv_reply_t)){
+			// TODO: change to TID later
+			if(logReply(STDOUT_FILENO, 6969, &request_reply) < 0){
+				fprintf(stderr,"logRequest: error writing reply to stdout\n");
+				exit(RC_OTHER);
+			}
+
+
+			if(write(user_fifo, &request_reply, sizeof(tlv_reply_t)) != sizeof(tlv_reply_t)){
 				perror("error writing to user fifo");
 				exit(RC_OTHER);
 			}

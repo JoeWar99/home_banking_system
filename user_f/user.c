@@ -14,6 +14,8 @@
 #include "../shared/com_protocol.h"
 #include "user_parse.h"
 
+#include "../shared/sope.h"
+
 
 int main(int argc, char *argv[])
 {
@@ -82,6 +84,11 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
+	if(logRequest(STDOUT_FILENO, pid, &full_request) < 0){
+		fprintf(stderr,"logRequest: error writing request to stdout\n");
+		exit(RC_OTHER);
+	}
+
     // Waiting for server response or timeout
 
     int user_fifo;
@@ -93,19 +100,37 @@ int main(int argc, char *argv[])
 
     tlv_reply_t request_reply;
   
-    while(1){
-        if(read (user_fifo, &request_reply, sizeof(tlv_reply_t)) != 0){
-            
-        }
-    }
+    
+	if(read (user_fifo, &request_reply, sizeof(tlv_reply_t)) != 0){
+		// printf("header :   account_id %d , ret_code %d\n", request_reply.value.header.account_id, request_reply.value.header.ret_code);
+		// switch (request_reply.type)
+		// {
+		// case OP_CREATE_ACCOUNT:
+		// 	printf("create\n");
+		// 	break;
+		// case OP_TRANSFER:
+		// 	printf("transfer: balance %d\n", request_reply.value.transfer.balance);
+		// 	break;
+		// case OP_BALANCE:
+		// 	printf("balance: balance %d\n", request_reply.value.balance.balance);
+		// 	break;
+		// case OP_SHUTDOWN:
+		// 	printf("shutdown: active offices %d\n", request_reply.value.shutdown.active_offices);
+		// 	break;
+		// }
+		if(logReply(STDOUT_FILENO, pid, &request_reply) < 0){
+			fprintf(stderr,"logRequest: error writing reply to stdout\n");
+			exit(RC_OTHER);
+		}
+		
+	}
+    
 
     // Free alocated memory
-    printf("hello\n");
     for (int i = 0; i < req_arg_count; i++)
     {
         free(req_args[i]);
     }
-    printf("goodbye\n");
 
     // Closing down fifos and unlinking user fifo
 

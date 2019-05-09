@@ -12,7 +12,6 @@ static int is_valid_balance_request(req_value_t request_value, bank_account_t * 
 static int is_valid_shutdown_request(req_value_t request_value, bank_account_t * accounts_database[]);
 
 int is_valid_request(tlv_request_t * request, bank_account_t * accounts_database[]){
-
 	switch (request->type)
 	{
 		case OP_CREATE_ACCOUNT:
@@ -40,13 +39,13 @@ int transfer_request(req_value_t request_value, bank_account_t * accounts_databa
 
 static int is_valid_create_request(req_value_t request_value, bank_account_t * accounts_database[]){
 	// TODO: escolher se primeiro testar login correto ou op_noallowed. Discutir isto
-	/* Testing if it is a admin request */
-	if(request_value.header.account_id != ADMIN_ACCOUNT_ID)
-		return RC_OP_NALLOW;
-
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
 		return RC_LOGIN_FAIL;
+
+	/* Testing if it is a admin request */
+	if(request_value.header.account_id != ADMIN_ACCOUNT_ID)
+		return RC_OP_NALLOW;
 
 	/* Verify if account already exists */	
 	if(accounts_database[request_value.create.account_id]->account_id != EMPTY_ACCOUNT_ID)
