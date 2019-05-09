@@ -226,167 +226,113 @@ int main(int argc, char *argv[])
 
     while (1)
     {
-        if (read(secure_svr, &request.type, sizeof(op_type_t)) != 0)
-        {
-            while (1)
-            {
-                if (read(secure_svr, &request.length, sizeof(uint32_t)) != 0)
-                {
-                    while (1)
-                    {
-                        if (read(secure_svr, &request.value, request.length) != 0)
-                        {
-                            //printf("consegui chear aqui agora ver se a informação está correta\n");
+		if (read_request(secure_svr, &request) != 0)
+		{
+			fprintf(stderr, "read_request: error reading the request\n");
+	        break;
+		}
 
-                             printf("header :   pid : %d , account_id %d , password %s, delay %d\n", request.value.header.pid, request.value.header.account_id, request.value.header.password, request.value.header.op_delay_ms);
-                             switch (request.type)
-                             {
-                             case OP_CREATE_ACCOUNT:
-                                 printf("create:  account_id %d, balance %d, password %s\n", request.value.create.account_id, request.value.create.balance, request.value.create.password);
-                                 break;
-                             case OP_TRANSFER:
-                                 printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-                                 break;
-                             case OP_BALANCE:
-                                 printf("balace\n");
-                                 break;
-                             case OP_SHUTDOWN:
-                             printf("shutdown\n");
-                                 break;
-                             }
+		// sem_wait(&empty);
+		// pthread_mutex_lock(&mutex_accounts_database);
 
-                            // sem_wait(&empty);
-                            // pthread_mutex_lock(&mutex_accounts_database);
+		if (queue_push(request_queue, &request) != 0)
+		{
+			fprintf(stderr, "queue_push: error pushing request to queue\n");
+			exit(RC_OTHER);
+		}
 
-                            if (queue_push(request_queue, &request) != 0)
-                            {
-                                fprintf(stderr, "queue_push: error pushing request to queue\n");
-                                exit(RC_OTHER);
-                            }
+		// pthread_mutex_unlock(&mutex_accounts_database);
+		// sem_post(&full);
 
-                            // pthread_mutex_unlock(&mutex_accounts_database);
-                            // sem_post(&full);
+		/*
+		* Passos:
+		* 	1) Receber pedido
+		*  2) Validar pedido
+		* 	3) Se válido executar pedido
+		* 	4) Responder ao cliente
+		*/
+		tlv_request_t *first_request = (tlv_request_t *)queue_front(request_queue);
+		if (first_request == NULL)
+		{
+			fprintf(stderr, "queue_front: error getting first queue element\n");
+			exit(RC_OTHER);
+		}
 
-                            /*
-			                * Passos:
-			                * 	1) Receber pedido
-			                *  2) Validar pedido
-			                * 	3) Se válido executar pedido
-			                * 	4) Responder ao cliente
-			                */
-                            tlv_request_t *first_request = (tlv_request_t *)queue_front(request_queue);
-                            if (first_request == NULL)
-                            {
-                                fprintf(stderr, "queue_front: error getting first queue element\n");
-                                exit(RC_OTHER);
-                            }
+		if (queue_pop(request_queue) != 0)
+		{
+			fprintf(stderr, "queue_pop: error removing first queue element\n");
+			exit(RC_OTHER);
+		}
 
-                            if (queue_pop(request_queue) != 0)
-                            {
-                                fprintf(stderr, "queue_pop: error removing first queue element\n");
-                                exit(RC_OTHER);
-                            }
+		// TODO: change to TID later
+		if (logRequest(STDOUT_FILENO, 6969, first_request) < 0)
+		{
+			fprintf(stderr, "logRequest: error writing request to stdout\n");
+			exit(RC_OTHER);
+		}
 
-                            // TODO: change to TID later
-                            if (logRequest(STDOUT_FILENO, 6969, first_request) < 0)
-                            {
-                                fprintf(stderr, "logRequest: error writing request to stdout\n");
-                                exit(RC_OTHER);
-                            }
+		if ((ret = is_valid_request(first_request, accounts_database)) == 0)
+		{
+			// printf("Valid request. Return: %d\n", ret);
+			switch (first_request->type)
+			{
+			case OP_CREATE_ACCOUNT:
+				if (create_request(first_request->value, accounts_database) != 0)
+				{
+					fprintf(stderr, "create_request: failed to create account.\n");
+					exit(RC_OTHER);
+				}
+				break;
+			case OP_TRANSFER:
+				// printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+				transfer_request(first_request->value, accounts_database);
+				break;
+			case OP_BALANCE:
+				// printf("balance\n");
+				break;
+			case OP_SHUTDOWN:
+				// printf("shutdown\n");
+				if (fchmod(secure_svr, 0444) != 0)
+				{
+					perror("fchmod: error altering server fifo permissions");
+					exit(RC_OTHER);
+				}
+				break;
+			}
+		}
+		// else
+		// 	printf("Invalid request. Return: %d\n", ret);
 
-                            if ((ret = is_valid_request(first_request, accounts_database)) == 0)
-                            {
-                                // printf("Valid request. Return: %d\n", ret);
-                                switch (first_request->type)
-                                {
-                                case OP_CREATE_ACCOUNT:
-                                    if (create_request(first_request->value, accounts_database) != 0)
-                                    {
-                                        fprintf(stderr, "create_request: failed to create account.\n");
-                                        exit(RC_OTHER);
-                                    }
-                                    break;
-                                case OP_TRANSFER:
-                                    // printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-                                    transfer_request(first_request->value, accounts_database);
-                                    break;
-                                case OP_BALANCE:
-                                    // printf("balance\n");
-                                    break;
-                                case OP_SHUTDOWN:
-                                    // printf("shutdown\n");
-                                    if (fchmod(secure_svr, 0444) != 0)
-                                    {
-                                        perror("fchmod: error altering server fifo permissions");
-                                        exit(RC_OTHER);
-                                    }
-                                    break;
-                                }
-                            }
-                            // else
-                            // 	printf("Invalid request. Return: %d\n", ret);
+		char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
+		init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
 
-                            char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
-                            init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
+		int user_fifo;
+		if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
+		{
+			perror("secure_fifo_name");
+			exit(RC_USR_DOWN);
+		}
 
-                            int user_fifo;
-                            if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
-                            {
-                                perror("secure_fifo_name");
-                                exit(RC_USR_DOWN);
-                            }
+		tlv_reply_t request_reply;
+		init_reply(&request_reply, first_request, ret, accounts_database);
 
-                            tlv_reply_t request_reply;
-                            init_reply(&request_reply, first_request, ret, accounts_database);
+		// TODO: change to TID later
+		if (logReply(STDOUT_FILENO, 6969, &request_reply) < 0)
+		{
+			fprintf(stderr, "logRequest: error writing reply to stdout\n");
+			break;
+		}		
+		
+		if(write_reply(user_fifo, &request_reply) != 0){
+			fprintf(stderr, "write_reply: error writing reply to server\n");
+			break;
+		}
 
-                            // TODO: change to TID later
-                            if (logReply(STDOUT_FILENO, 6969, &request_reply) < 0)
-                            {
-                                fprintf(stderr, "logRequest: error writing reply to stdout\n");
-                                exit(RC_OTHER);
-                            }
-
-                         /*   if (write(user_fifo, &request_reply, sizeof(tlv_reply_t)) != sizeof(tlv_reply_t))
-                            {
-                                perror("error writing to user fifo");
-                                exit(RC_OTHER);
-                            }*/
-                            
-                            
-                            if (write(user_fifo, &request_reply.type, sizeof(op_type_t)) == sizeof(op_type_t))
-                            {
-                                if (write(user_fifo, &request_reply.length, sizeof(uint32_t)) == sizeof(uint32_t))
-                                {
-                                    if (write(user_fifo, &request_reply.value, request_reply.length) != request_reply.length)
-                                    {
-                                        perror("write: error writing to user");
-                                        exit(RC_OTHER);
-                                    }
-                                }
-                                else
-                                {
-                                    perror("write: error writing to user");
-                                    exit(RC_OTHER);
-                                }
-                            }
-                            else
-                            {
-                                perror("write: error writing to user");
-                                exit(RC_OTHER);
-                            }
-
-                            if (close(user_fifo) != 0)
-                            {
-                                perror("error closing down server fifo");
-                                exit(RC_OTHER);
-                            }
-                            break;
-                        }
-                    }
-                    break;
-                }
-            }
-        }
+		if (close(user_fifo) != 0)
+		{
+			perror("error closing down server fifo");
+			break;
+		}
     }
 
     // Free allocated memory

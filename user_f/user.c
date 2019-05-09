@@ -78,7 +78,7 @@ int main(int argc, char *argv[])
         exit(RC_SRV_DOWN);
     }
 	if(write_request(secure_svr, &full_request) != 0){
-		fprintf(stderr, "write: error writing to server\n");
+		fprintf(stderr, "write_request: error writing  request to server\n");
 		exit(RC_OTHER);
 	}
 
