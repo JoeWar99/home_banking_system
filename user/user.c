@@ -92,11 +92,9 @@ int main(int argc, char *argv[])
         fprintf(stderr, "Invalid request arguments\n");
         exit(RC_OTHER);
     }
-    printf("estou aqui\n");
 
-    int user_fifo;
+    // TODO could use static inicialization, but concat first argument doesnt allow
     char *secure_fifo_name = (char *)malloc(sizeof(char) * (strlen(USER_FIFO_PATH_PREFIX) + 1));
-
     strcpy(secure_fifo_name, USER_FIFO_PATH_PREFIX);
     secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX)] = '\0';
 
@@ -134,6 +132,7 @@ int main(int argc, char *argv[])
 
     // Waiting for server response or timeout
 
+    int user_fifo;
     if ((user_fifo = open(secure_fifo_name, O_RDONLY)) == -1)
     {
         perror("open");

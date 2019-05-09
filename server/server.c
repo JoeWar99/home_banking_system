@@ -24,7 +24,7 @@ sem_t full, empty;
 pthread_mutex_t mutex_accounts_database = PTHREAD_MUTEX_INITIALIZER;
 /* Max Bank Account number + 1 (admin) */
 bank_account_t * accounts_database[MAX_BANK_ACCOUNTS + 1];
-queue_t *resquest_queue;
+queue_t *request_queue;
 
 void *balconies(void *arg)
 {
@@ -32,14 +32,14 @@ void *balconies(void *arg)
     sem_wait(&full);
     pthread_mutex_lock(&mutex_accounts_database);
 
-    tlv_request_t *first_request = (tlv_request_t *)queue_front(resquest_queue);
+    tlv_request_t *first_request = (tlv_request_t *)queue_front(request_queue);
     if (first_request == NULL)
     {
         perror("queue_front: error getting first queue element");
         exit(RC_OTHER);
     }
 
-    if (queue_pop(resquest_queue) != 0)
+    if (queue_pop(request_queue) != 0)
     {
         perror("queue_pop: error removing first queue element");
         exit(RC_OTHER);
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 
     if (argc != 3)
     {
-        printf("Usage: %s <n_threads> <admin_pwd>\n", argv[0]);
+        fprintf(stderr, "Usage: %s <n_threads> <admin_pwd>\n", argv[0]);
         exit(RC_OTHER);
     }
 
@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
 
     if (n_threads_console <= 0)
     {
-        printf("Error: The numbers of threads cannot be negative or zero\n");
+        fprintf(stderr, "Error: The numbers of threads must be greater than 0\n");
         exit(RC_OTHER);
     }
 
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-    if ((resquest_queue = init_queue()) == NULL)
+    if ((request_queue = init_queue()) == NULL)
     {
         perror("init_queue: error initialing the queue");
         exit(RC_OTHER);
@@ -155,13 +155,13 @@ int main(int argc, char *argv[])
 
     if (sem_init(&full, SHARED, 0) != 0)
     {
-        perror("sem_init: erro initializing semaphore");
+        perror("sem_init: error initializing full semaphore");
         exit(RC_OTHER);
     }
 
     if (sem_init(&empty, SHARED, n_threads) != 0)
     {
-        perror("sem_init: erro initializing semaphore empty");
+        perror("sem_init: error initializing empty semaphore");
         exit(RC_OTHER);
     }
 
@@ -172,12 +172,12 @@ int main(int argc, char *argv[])
     {
         if (errno != EEXIST)
         {
-            printf("Could not create fifo %s\n", SERVER_FIFO_PATH);
+            fprintf(stderr, "Could not create fifo %s\n", SERVER_FIFO_PATH);
             exit(RC_OTHER);
         }
     }
 
-	 int id;
+	int id;
     pthread_t thread_id[n_threads];
 
     for (int i = 0; i < n_threads; i++)
@@ -190,8 +190,10 @@ int main(int argc, char *argv[])
     }
 
 	/* Allocate accounts_database */
-	for(uint32_t i = 0; i < MAX_BANK_ACCOUNTS + 1; i++)
+	for(uint32_t i = 0; i < MAX_BANK_ACCOUNTS + 1; i++) {
 		accounts_database[i] = (bank_account_t *)malloc(sizeof(bank_account_t));
+        accounts_database[i]->account_id = EMPTY_ACCOUNT_ID;
+    }
 
     // CREATE METHOD TO ADD ACCOUNTS - store in a list???
     //bank_account_t admin_account = {ADMIN_ACCOUNT_ID, "", "", 0};
@@ -248,7 +250,7 @@ int main(int argc, char *argv[])
             // sem_wait(&empty);
             // pthread_mutex_lock(&mutex_accounts_database);
 
-            if (queue_push(resquest_queue, &request) != 0)
+            if (queue_push(request_queue, &request) != 0)
             {
                 fprintf(stderr, "queue_push: error pushing request to queue\n");
                 exit(RC_OTHER);
@@ -264,13 +266,13 @@ int main(int argc, char *argv[])
 			 * 	3) Se válido executar pedido
 			 * 	4) Responder ao cliente
 			 */
-			tlv_request_t * first_request = (tlv_request_t * )queue_front(resquest_queue);
+			tlv_request_t * first_request = (tlv_request_t * )queue_front(request_queue);
 			if(first_request == NULL){
 				fprintf(stderr,"queue_front: error getting first queue element\n");
 				exit(RC_OTHER);
 			}
 
-			if(queue_pop(resquest_queue) != 0){
+			if(queue_pop(request_queue) != 0){
 				fprintf(stderr,"queue_pop: error removing first queue element\n");
 				exit(RC_OTHER);
 			}
@@ -287,11 +289,11 @@ int main(int argc, char *argv[])
 					}
 					break;
 				case OP_TRANSFER:
-					printf("transfer:  accoutn_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
+					printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
 					transfer_request(first_request->value, accounts_database);
 					break;
 				case OP_BALANCE:
-					printf("balace\n");
+					printf("balance\n");
 					break;
 				case OP_SHUTDOWN:
 					printf("shutdown\n");
@@ -302,55 +304,38 @@ int main(int argc, char *argv[])
 					}
 					break;
 				}
-
 			}
 			else
 				printf("Invalid request. Return: %d\n", ret);
 
-			tlv_reply_t *request_reply = (tlv_reply_t *)malloc(sizeof(tlv_reply_t));
-			if(request_reply == NULL){
-				perror("error allocating space to request_reply");
-				exit(RC_OTHER);
-			}
-
-			init_reply(request_reply, first_request, ret, accounts_database);
+			tlv_reply_t request_reply;
+			init_reply(&request_reply, first_request, ret, accounts_database);
 			
-			int user_fifo;
-
-			char *secure_fifo_name = (char *)malloc(sizeof(char) * (strlen(USER_FIFO_PATH_PREFIX) + 1));
-			if(request_reply == NULL){
-				perror("error allocating space to secure_fifo_name");
-				exit(RC_OTHER);
-			}
+            char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX)+1];
 			init_reply_fifo_name(secure_fifo_name, first_request->value.header.pid);
 
-
-
+			int user_fifo;
 			if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
 			{
 				perror("secure_fifo_name");
 				exit(RC_USR_DOWN);
 			}
 
-
 			if(write(user_fifo, &request_reply, sizeof(tlv_reply_t))!=sizeof(tlv_reply_t)){
 				perror("error writing to user fifo");
 				exit(RC_OTHER);
 			}
-
 
 			if (close(user_fifo) != 0)
 			{
 				perror("error closing down server fifo");
 				exit(RC_OTHER);
 			}
-			
         }
     }
 
     // Free allocated memory
-
-    if (del_queue(resquest_queue) != 0)
+    if (del_queue(request_queue) != 0)
     {
         fprintf(stderr,"del_queue: error deleting queue\n");
         exit(RC_OTHER);

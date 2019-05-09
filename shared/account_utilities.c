@@ -21,10 +21,13 @@ int valid_pwd(char * pwd) {
 }
 
 int authenticate(char * pwd, bank_account_t * bank_account){
+	if (bank_account->account_id == EMPTY_ACCOUNT_ID) return 1;
 	char * hash = (char*) malloc(strlen(bank_account->hash));
 	gen_hash(pwd, bank_account->salt, hash);
-	return strcmp(hash, bank_account->hash);
+	int comp = strcmp(hash, bank_account->hash);
+	return comp;
 }
+
 
 int create_account(char * pwd, uint32_t account_id, uint32_t balance, bank_account_t * accounts_database[]){
 	if(gen_salt(accounts_database[account_id]->salt, SALT_LEN + 1, SALT_LEN) != 0)

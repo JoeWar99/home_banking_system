@@ -41,7 +41,7 @@ int transfer_request(req_value_t request_value, bank_account_t * accounts_databa
 static int is_valid_create_request(req_value_t request_value, bank_account_t * accounts_database[]){
 	// TODO: escolher se primeiro testar login correto ou op_noallowed. Discutir isto
 	/* Testing if it is a admin request */
-	if(request_value.header.account_id != 0)
+	if(request_value.header.account_id != ADMIN_ACCOUNT_ID)
 		return RC_OP_NALLOW;
 
 	/* Verify password */
@@ -58,16 +58,13 @@ static int is_valid_create_request(req_value_t request_value, bank_account_t * a
 }
 
 static int is_valid_transfer_request(req_value_t request_value, bank_account_t * accounts_database[]){
-	// TODO: isto n esta 100% certo
-	if(accounts_database[request_value.header.account_id]->account_id == 0)
-		return RC_OTHER;
 
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
 		return RC_LOGIN_FAIL;
 
 	/* Return OP_NALLOW if the request is made by the admin */
-	if(request_value.header.account_id == 0)
+	if(request_value.header.account_id == ADMIN_ACCOUNT_ID)
 		return RC_OP_NALLOW;
 
 	/* Verify if destination id exists */
@@ -90,31 +87,27 @@ static int is_valid_transfer_request(req_value_t request_value, bank_account_t *
 }
 
 static int is_valid_balance_request(req_value_t request_value, bank_account_t * accounts_database[]){
-	// TODO: isto n esta 100% certo
-	if(accounts_database[request_value.header.account_id]->account_id == 0)
-		return RC_OTHER;
 
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
 		return RC_LOGIN_FAIL;
 
 	/* Return OP_NALLOW if the request is made by the admin */
-	if(request_value.header.account_id == 0)
+	if(request_value.header.account_id == ADMIN_ACCOUNT_ID)
 		return RC_OP_NALLOW;
 
 	return RC_OK;
 }
 
 static int is_valid_shutdown_request(req_value_t request_value, bank_account_t * accounts_database[]){
-	// TODO: ver mesmo que antes
-	/* Return OP_NALLOW if the request is made a client */
-	if(request_value.header.account_id != 0)
-		return RC_OP_NALLOW;
 
 	/* Verify password */
 	if(authenticate(request_value.header.password, accounts_database[request_value.header.account_id]) != 0)
 		return RC_LOGIN_FAIL;
 
+	/* Return OP_NALLOW if the request is made by a client */
+	if(request_value.header.account_id != ADMIN_ACCOUNT_ID)
+		return RC_OP_NALLOW;
 
 	return RC_OK;
 }
