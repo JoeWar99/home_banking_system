@@ -48,7 +48,8 @@ void exit_user_process()
     }
 }
 
-void sigalarm_handler(int signo)
+//void sigalarm_handler(int signo)
+void sigalarm_handler()
 {
     exit_user_process();
     exit(RC_SRV_TIMEOUT);
@@ -128,7 +129,8 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-    int error_due_to_alarm = 0;
+	// TODO: isto nunca e usado!! ver melhor
+    //int error_due_to_alarm = 0;
 
     alarm(FIFO_TIMEOUT_SECS);
 

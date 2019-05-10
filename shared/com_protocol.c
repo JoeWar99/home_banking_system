@@ -41,6 +41,8 @@ void init_request(tlv_request_t * full_request, int operation, int pid, int acco
             user_transfer->amount = atoi(req_args[1]);
             req_size += sizeof(req_transfer_t);
             break;
+		default:
+			break;
     }
 
     full_request->length = req_size;
@@ -74,6 +76,9 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, bank_accou
 				reply->value.shutdown.active_offices = 69;
 				rep_size += sizeof(rep_shutdown_t);
 				printf("To be implemented\n");
+				break;
+			default:
+				break;
 		}
 	}
 	if(reply->type == OP_TRANSFER){

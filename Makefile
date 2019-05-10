@@ -1,51 +1,32 @@
 CC=gcc
-CFLAGS=-Wextra -pthread
+CFLAGS = -Wall -Werror -Wextra
+LBLIBS = -pthread -lrt
 
-rebuild: clean all
+SRC_USER = user_f/user.c user_f/user_parse.c shared/crypto.c shared/utilities.c shared/account_utilities.c shared/com_protocol.c shared/log.c
+SRC_SERVER = server_f/server.c server_f/server_parse.c server_f/requests.c shared/crypto.c shared/utilities.c shared/queue.c shared/account_utilities.c shared/com_protocol.c shared/log.c
+OBJ_USER = $(SRC_USER:.c=.o)
+OBJ_SERVER = $(SRC_SERVER:.c=.o)
+EXEC1 = server
+EXEC2 = user
+DEPS = $(patsubst %.c,%.d,$(wildcard *.c))
 
-all: user_f server_f
+.PHONY: all clean
 
-user_f: user.o user_parse.o crypto.o utilities.o account_utilities.o com_protocol.o log.o
-	$(CC) user.o user_parse.o crypto.o utilities.o account_utilities.o com_protocol.o log.o -o user $(CFLAGS)
+all: $(EXEC1) $(EXEC2)
 
-server_f: server.o server_parse.o crypto.o utilities.o queue.o requests.o account_utilities.o com_protocol.o log.o
-	$(CC) server.o server_parse.o crypto.o utilities.o queue.o requests.o account_utilities.o com_protocol.o log.o -o server $(CFLAGS)
+%.o: %.c
+	$(CC) $(CFLAGS) -MMD -c $< -o $@
 
-server.o: server_f/server.c
-	$(CC) -c server_f/server.c $(CFLAGS)
+$(EXEC1): $(OBJ_SERVER)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_SERVER) $(LBLIBS)
 
-requests.o: server_f/requests.c shared/account_utilities.c
-	$(CC) -c server_f/requests.c shared/account_utilities.c $(CFLAGS)
+$(EXEC2): $(OBJ_USER)
+	$(CC) $(CFLAGS) -o $@ $(OBJ_USER) $(LBLIBS)
 
-com_protocol.o: shared/com_protocol.c shared/utilities.c
-	$(CC) -c shared/com_protocol.c shared/utilities.c $(CFLAGS)
-
-user.o: user_f/user.c
-	$(CC) -c user_f/user.c $(CFLAGS)
-
-server_parse.o: server_f/server_parse.c shared/utilities.c
-	$(CC) -c server_f/server_parse.c shared/utilities.c $(CFLAGS)
-
-user_parse.o: user_f/user_parse.c shared/utilities.c
-	$(CC) -c user_f/user_parse.c shared/utilities.c $(CFLAGS)
-
-crypto.o: shared/crypto.c
-	$(CC) -c shared/crypto.c $(CFLAGS)
-
-account_utilities.o: shared/account_utilities.c shared/utilities.c shared/crypto.c
-	$(CC) -c shared/account_utilities.c shared/utilities.c shared/crypto.c $(CFLAGS)
-
-utilities.o: shared/utilities.c
-	$(CC) -c shared/utilities.c $(CFLAGS)
-
-log.o: shared/log.c
-	$(CC) -c shared/log.c $(CFLAGS)
-
-queue.o: shared/queue.c
-	$(CC) -c shared/queue.c $(CFLAGS)
-
-clean: 
-	rm *.o user server
+clean:
+	rm -rf $(EXEC1) $(EXEC2) *.o *.d
 
 clean_fifo:
 	rm -rf /tmp/secure_*
+
+-include $(DEPS)

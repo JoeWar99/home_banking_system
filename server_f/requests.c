@@ -25,6 +25,8 @@ int is_valid_request(tlv_request_t * request, bank_account_t * accounts_database
 			return is_valid_balance_request(&request->value, accounts_database);
 		case OP_SHUTDOWN:
 			return is_valid_shutdown_request(&request->value, accounts_database);
+		default:
+			return RC_OTHER;
 	}
 }
 

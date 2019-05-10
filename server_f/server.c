@@ -122,6 +122,8 @@ void *balconies(void *arg)
                     perror("fchmod: error altering server fifo permissions");*/
                 //  exit(RC_OTHER);
                 break;
+			default:
+				break;
             }
         }
 
