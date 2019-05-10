@@ -37,3 +37,5 @@
 #define EMPTY_ACCOUNT_ID (MAX_BANK_ACCOUNTS+1)
 
 #define WIDTH_PID 5
+
+#define SHARED_SEM 0

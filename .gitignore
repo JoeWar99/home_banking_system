@@ -1,4 +1,5 @@
 *.o
-*_exe
+server
+user
 .vscode/
 *.pdf

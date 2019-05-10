@@ -26,7 +26,6 @@ int main(int argc, char *argv[])
     }
 
     int pid = getpid();
-    int secure_svr;
     int account_id, op_delay, operation;
 
     account_id = atoi(argv[1]);
@@ -55,9 +54,9 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
+    /* Create user specific fifo */
     char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
     init_secure_fifo_name(secure_fifo_name, pid);
-
     if (mkfifo(secure_fifo_name, 0660) < 0)
     {
         if (errno != EEXIST)
@@ -70,13 +69,15 @@ int main(int argc, char *argv[])
     tlv_request_t full_request;
     init_request(&full_request, operation, pid, account_id, pwd, op_delay, req_args);
 
-    //Opening server fifo
-
+    /* Open server fifo */
+    int secure_svr;
     if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY)) == -1)
     {
         perror("open: server is not working 404 error");
         exit(RC_SRV_DOWN);
     }
+
+    /* Write request */
 	if(write_request(secure_svr, &full_request) != 0){
 		fprintf(stderr, "write_request: error writing  request to server\n");
 		exit(RC_OTHER);
@@ -88,8 +89,7 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-    // Waiting for server response or timeout
-
+    /* Open user specific fifo */
     int user_fifo;
     if ((user_fifo = open(secure_fifo_name, O_RDONLY)) == -1)
     {
@@ -97,8 +97,8 @@ int main(int argc, char *argv[])
         exit(RC_USR_DOWN);
     }
 
+    /* Read server reply */
     tlv_reply_t request_reply;
-
 	if(read_reply(user_fifo, &request_reply) != 0){
 		fprintf(stderr, "read_reply: error reading reply from fifo\n");
 		exit(RC_OTHER);
@@ -109,41 +109,14 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "logRequest: error writing reply to stdout\n");
 		exit(RC_OTHER);
 	}
-	
 
-    /* if (read(user_fifo, &request_reply, sizeof(tlv_reply_t)) != 0)
-    {
-        // printf("header :   account_id %d , ret_code %d\n", request_reply.value.header.account_id, request_reply.value.header.ret_code);
-        // switch (request_reply.type)
-        // {
-        // case OP_CREATE_ACCOUNT:
-        // 	printf("create\n");
-        // 	break;
-        // case OP_TRANSFER:
-        // 	printf("transfer: balance %d\n", request_reply.value.transfer.balance);
-        // 	break;
-        // case OP_BALANCE:
-        // 	printf("balance: balance %d\n", request_reply.value.balance.balance);
-        // 	break;
-        // case OP_SHUTDOWN:
-        // 	printf("shutdown: active offices %d\n", request_reply.value.shutdown.active_offices);
-        // 	break;
-        // }
-        if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
-        {
-            fprintf(stderr, "logRequest: error writing reply to stdout\n");
-            exit(RC_OTHER);
-        }
-    }*/
-
-    // Free alocated memory
+    /* Free alocated memory */
     for (int i = 0; i < req_arg_count; i++)
     {
         free(req_args[i]);
     }
 
-    // Closing down fifos and unlinking user fifo
-
+    /* Close server fifo descriptor */
     if (close(secure_svr) != 0)
     {
         perror("close: error closing down server fifo");
@@ -156,6 +129,7 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }*/
 
+    /* Unlink user specific fifo */
     if (unlink(secure_fifo_name) != 0)
     {
         perror("unlink: error unlinking user fifo");
