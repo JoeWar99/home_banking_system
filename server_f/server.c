@@ -22,6 +22,7 @@
 
 sem_t full, empty;
 pthread_mutex_t mutex_accounts_database = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t mutex_request_queue = PTHREAD_MUTEX_INITIALIZER;
 /* Max Bank Account number + 1 (admin) */
 bank_account_t *accounts_database[MAX_BANK_ACCOUNTS + 1];
 queue_t *request_queue;
@@ -37,6 +38,13 @@ void *balconies(void *arg)
 
     logBankOfficeOpen(STDOUT_FILENO, id_thread, pid_thread);
 
+    /*
+    * Passos:
+    * 	1) Receber pedido
+    *   2) Validar pedido
+    * 	3) Se válido executar pedido
+    * 	4) Responder ao cliente    
+    */
     while (1)
     {
         if (sem_getvalue(&full, &full_aux) != 0)
@@ -45,19 +53,15 @@ void *balconies(void *arg)
             exit(RC_OTHER);
         }
 
-        logSyncMechSem(STDOUT_FILENO, id_thread, SYNC_OP_SEM_WAIT, SYNC_ROLE_CONSUMER,0, full_aux);
+        /* Wait full */
+        logSyncMechSem(STDOUT_FILENO, id_thread, SYNC_OP_SEM_WAIT, SYNC_ROLE_CONSUMER, 0, full_aux);
         sem_wait(&full);
-        pthread_mutex_lock(&mutex_accounts_database);
+
+        /* Wait mutex */
+        pthread_mutex_lock(&mutex_request_queue);
         logSyncMech(STDOUT_FILENO, id_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_CONSUMER, 0);
 
-        /*
-		* Passos:
-		* 	1) Receber pedido
-		*   2) Validar pedido
-		* 	3) Se válido executar pedido
-		* 	4) Responder ao cliente
-    
-		*/
+        /* Take item */
         first_request = (tlv_request_t *)queue_front(request_queue);
         if (first_request == NULL)
         {
@@ -71,8 +75,19 @@ void *balconies(void *arg)
         //    exit(RC_OTHER);
         }
 
-        pthread_mutex_unlock(&mutex_accounts_database);
+        /* Signal mutex */
+        pthread_mutex_unlock(&mutex_request_queue);
         logSyncMech(STDOUT_FILENO, id_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_CONSUMER, first_request->value.header.pid);
+
+        /* Signal empty */
+        sem_post(&empty);
+        if (sem_getvalue(&empty, &empty_aux) != 0)
+        {
+            perror("sem_get_value:");
+            exit(RC_OTHER);
+        }
+        logSyncMechSem(STDOUT_FILENO, id_thread, SYNC_OP_SEM_POST, SYNC_ROLE_CONSUMER, first_request->value.header.pid, empty_aux);
+
 
         // TODO: change to TID later
         if (logRequest(STDOUT_FILENO, 6969, first_request) < 0)
@@ -83,7 +98,11 @@ void *balconies(void *arg)
 
         if ((ret = is_valid_request(first_request, accounts_database)) == 0)
         {
-            // printf("Valid request. Return: %d\n", ret);
+            /* Lock mutex to prevent conflicts when accessing accounts */
+            pthread_mutex_lock(&mutex_accounts_database);
+
+            sleep(3);
+
             switch (first_request->type)
             {
             case OP_CREATE_ACCOUNT:
@@ -108,6 +127,9 @@ void *balconies(void *arg)
                 //  exit(RC_OTHER);
                 break;
             }
+
+            /* Unlock accounts mutex */
+            pthread_mutex_unlock(&mutex_accounts_database);
         }
 
         char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
@@ -129,22 +151,17 @@ void *balconies(void *arg)
             fprintf(stderr, "logRequest: error writing reply to stdout\n");
         }
 
+        /* Send reply to user */
         if (write_reply(user_fifo, &request_reply) != 0)
         {
             fprintf(stderr, "write_reply: error writing reply to server\n");
         }
 
+        /* Close user specific fifo */
         if (close(user_fifo) != 0)
         {
             perror("error closing down server fifo");
         }
-        sem_post(&empty);
-        if (sem_getvalue(&empty, &empty_aux) != 0)
-        {
-            perror("sem_get_value:");
-            exit(RC_OTHER);
-        }
-        logSyncMechSem(STDOUT_FILENO, id_thread, SYNC_OP_SEM_POST, SYNC_ROLE_CONSUMER, first_request->value.header.pid, empty_aux);
     }
 
     logBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread);
@@ -175,6 +192,7 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
+    /* TODO what is this??? maybe define a macro */
     int id_main_thread = 0;
 
     /* Initialize FULL semaphore with 0 */
@@ -246,6 +264,7 @@ int main(int argc, char *argv[])
     tlv_request_t request;
     while (1)
     {
+        /* Produce item */
         if (read_request(secure_svr, &request) != 0)
         {
             fprintf(stderr, "read_request: error reading the request\n");
@@ -264,18 +283,26 @@ int main(int argc, char *argv[])
             exit(RC_OTHER);
         }
 
+        /* Wait empty */
         logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_WAIT, SYNC_ROLE_PRODUCER, request.value.header.pid, empty_aux);
         sem_wait(&empty);
-        pthread_mutex_lock(&mutex_accounts_database);
+
+        /* Wait mutex */
+        pthread_mutex_lock(&mutex_request_queue);
         logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_ACCOUNT, request.value.header.pid);
 
+        /* Append item */
         if (queue_push(request_queue, &request) != 0)
         {
             fprintf(stderr, "queue_push: error pushing request to queue\n");
             exit(RC_OTHER);
         }
-        pthread_mutex_unlock(&mutex_accounts_database);
+
+        /* Signal mutex */
+        pthread_mutex_unlock(&mutex_request_queue);
         logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_ACCOUNT, request.value.header.pid);
+
+        /* Signal full */
         sem_post(&full);
         if (sem_getvalue(&full, &full_aux) != 0)
         {
