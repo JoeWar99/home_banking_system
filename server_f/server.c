@@ -96,13 +96,11 @@ void *balconies(void *arg)
         //    exit(RC_OTHER);
         }
 
+        /* Lock mutex to prevent conflicts when accessing accounts */
+        pthread_mutex_lock(&mutex_accounts_database);
+
         if ((ret = is_valid_request(first_request, accounts_database)) == 0)
         {
-            /* Lock mutex to prevent conflicts when accessing accounts */
-            pthread_mutex_lock(&mutex_accounts_database);
-
-            sleep(3);
-
             switch (first_request->type)
             {
             case OP_CREATE_ACCOUNT:
@@ -127,10 +125,10 @@ void *balconies(void *arg)
                 //  exit(RC_OTHER);
                 break;
             }
-
-            /* Unlock accounts mutex */
-            pthread_mutex_unlock(&mutex_accounts_database);
         }
+
+        /* Unlock accounts mutex */
+        pthread_mutex_unlock(&mutex_accounts_database);
 
         char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
         init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
@@ -162,6 +160,8 @@ void *balconies(void *arg)
         {
             perror("error closing down server fifo");
         }
+
+        free(first_request);
     }
 
     logBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread);
@@ -261,17 +261,18 @@ int main(int argc, char *argv[])
 
     int full_aux;
     int empty_aux;
-    tlv_request_t request;
     while (1)
     {
+
         /* Produce item */
-        if (read_request(secure_svr, &request) != 0)
+        tlv_request_t * request;
+        if ((request=read_request(secure_svr)) == NULL)
         {
             fprintf(stderr, "read_request: error reading the request\n");
             break;
         }
 
-        if (logRequest(STDOUT_FILENO, id_main_thread, &request) < 0)
+        if (logRequest(STDOUT_FILENO, id_main_thread, request) < 0)
         {
             fprintf(stderr, "logRequest: error writing request to stdout\n");
             exit(RC_OTHER);
@@ -284,15 +285,15 @@ int main(int argc, char *argv[])
         }
 
         /* Wait empty */
-        logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_WAIT, SYNC_ROLE_PRODUCER, request.value.header.pid, empty_aux);
+        logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_WAIT, SYNC_ROLE_PRODUCER, request->value.header.pid, empty_aux);
         sem_wait(&empty);
 
         /* Wait mutex */
         pthread_mutex_lock(&mutex_request_queue);
-        logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_ACCOUNT, request.value.header.pid);
+        logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_ACCOUNT, request->value.header.pid);
 
         /* Append item */
-        if (queue_push(request_queue, &request) != 0)
+        if (queue_push(request_queue, request) != 0)
         {
             fprintf(stderr, "queue_push: error pushing request to queue\n");
             exit(RC_OTHER);
@@ -300,7 +301,7 @@ int main(int argc, char *argv[])
 
         /* Signal mutex */
         pthread_mutex_unlock(&mutex_request_queue);
-        logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_ACCOUNT, request.value.header.pid);
+        logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_ACCOUNT, request->value.header.pid);
 
         /* Signal full */
         sem_post(&full);
@@ -309,7 +310,7 @@ int main(int argc, char *argv[])
             perror("sem_get_value:");
             exit(RC_OTHER);
         }
-        logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_POST, SYNC_ROLE_PRODUCER, request.value.header.pid, full_aux);
+        logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_POST, SYNC_ROLE_PRODUCER, request->value.header.pid, full_aux);
     }
 
     /* Delete requests queue */

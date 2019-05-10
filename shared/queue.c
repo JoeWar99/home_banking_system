@@ -61,7 +61,6 @@ int queue_push(queue_t *q, void * val){
 
 	/* Assign correct pointers */
 	iter->next = new_node;
-	//new_node->next = NULL;
 	return 0;
 }
 
@@ -76,8 +75,6 @@ int queue_pop(queue_t *q){
 	q->front = q->front->next;
 
 	/* Free allocated memory */
-	// TODO: ver isto pq supostamente assim é que estaria correto mas ele queixa se de double free
-	//free(temp->val);
 	free(temp);
 
 	return 0;

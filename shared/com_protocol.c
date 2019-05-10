@@ -125,12 +125,24 @@ int write_request(int fd, tlv_request_t * request){
 	return 0;
 }
 
-int read_request(int fd, tlv_request_t * request){
-	if (read(fd, &(request->type), sizeof(op_type_t)) <= 0)
-		return -1;
-	if (read(fd, &(request->length), sizeof(uint32_t)) <= 0)
-		return -1;
-	if (read(fd, &(request->value), request->length) <= 0)
-		return -1;
-	return 0;
+tlv_request_t * read_request(int fd){
+	op_type_t type;
+	uint32_t req_length;
+	
+	if (read(fd, &type, sizeof(op_type_t)) <= 0)
+		return NULL;
+
+	if (read(fd, &req_length, sizeof(uint32_t)) <= 0)
+		return NULL;
+
+	tlv_request_t * request = (tlv_request_t*)malloc(sizeof(tlv_request_t));
+	request->type = type;
+	request->length = req_length;
+
+	if (read(fd, &(request->value), request->length) <= 0) {
+		free(request);
+		return NULL;
+	}
+
+	return request;
 }

@@ -123,11 +123,11 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-    /* if (close(user_fifo) != 0)
+    if (close(user_fifo) != 0)
     {
         perror("close: error closing down user fifo");
         exit(RC_OTHER);
-    }*/
+    }
 
     /* Unlink user specific fifo */
     if (unlink(secure_fifo_name) != 0)
