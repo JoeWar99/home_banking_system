@@ -136,7 +136,9 @@ void *balconies(void *arg)
         }
 
         tlv_reply_t request_reply;
+        pthread_mutex_lock(&accounts_db_mutex[first_request->value.header.account_id]);
         init_reply(&request_reply, first_request, ret, accounts_database);
+        pthread_mutex_unlock(&accounts_db_mutex[first_request->value.header.account_id]);
 
         // TODO: change to TID later
         if (logReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
