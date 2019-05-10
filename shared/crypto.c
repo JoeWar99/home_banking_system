@@ -26,7 +26,7 @@ int gen_salt(char * buf, int buf_size, int salt_size) {
     return 0;
 }
 
-int gen_hash(char * pwd, char * salt, char * hash) {
+int gen_hash(const char * pwd, char * salt, char * hash) {
     FILE * fp;
     char full_cmd[ MAX_PASSWORD_LEN + SALT_LEN + 20 + 1];
     full_cmd[0] = '\0';
@@ -48,7 +48,7 @@ int gen_hash(char * pwd, char * salt, char * hash) {
         perror("pclose");
         return -1;
     }
-
+/* TODO handle slow call interruption ??? */
 /*
     int ret = pclose(fp);
 	if (ret)

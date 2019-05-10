@@ -21,11 +21,12 @@
 #include "requests.h"
 
 sem_t full, empty;
-pthread_mutex_t mutex_accounts_database = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t mutex_request_queue = PTHREAD_MUTEX_INITIALIZER;
-/* Max Bank Account number + 1 (admin) */
-bank_account_t *accounts_database[MAX_BANK_ACCOUNTS + 1];
+
+bank_account_t *accounts_database[MAX_BANK_ACCOUNTS];
+pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS];
+
 queue_t *request_queue;
+pthread_mutex_t req_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *balconies(void *arg)
 {
@@ -58,7 +59,7 @@ void *balconies(void *arg)
         sem_wait(&full);
 
         /* Wait mutex */
-        pthread_mutex_lock(&mutex_request_queue);
+        pthread_mutex_lock(&req_queue_mutex);
         logSyncMech(STDOUT_FILENO, id_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_CONSUMER, 0);
 
         /* Take item */
@@ -76,7 +77,7 @@ void *balconies(void *arg)
         }
 
         /* Signal mutex */
-        pthread_mutex_unlock(&mutex_request_queue);
+        pthread_mutex_unlock(&req_queue_mutex);
         logSyncMech(STDOUT_FILENO, id_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_CONSUMER, first_request->value.header.pid);
 
         /* Signal empty */
@@ -96,15 +97,12 @@ void *balconies(void *arg)
         //    exit(RC_OTHER);
         }
 
-        /* Lock mutex to prevent conflicts when accessing accounts */
-        pthread_mutex_lock(&mutex_accounts_database);
-
         if ((ret = is_valid_request(first_request, accounts_database)) == 0)
         {
             switch (first_request->type)
             {
             case OP_CREATE_ACCOUNT:
-                if (create_request(first_request->value, accounts_database) != 0)
+                if (create_request(&first_request->value, accounts_database) != 0)
                 {
                     fprintf(stderr, "create_request: failed to create account.\n");
                     //   exit(RC_OTHER);
@@ -112,7 +110,7 @@ void *balconies(void *arg)
                 break;
             case OP_TRANSFER:
                 // printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-                transfer_request(first_request->value, accounts_database);
+                transfer_request(&first_request->value, accounts_database);
                 break;
             case OP_BALANCE:
                 // printf("balance\n");
@@ -126,9 +124,6 @@ void *balconies(void *arg)
                 break;
             }
         }
-
-        /* Unlock accounts mutex */
-        pthread_mutex_unlock(&mutex_accounts_database);
 
         char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
         init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
@@ -175,6 +170,7 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
+    /* Generate new random seed */
     srand(time(NULL));
 
     int n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
@@ -236,11 +232,12 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* Allocate accounts_database */
-    for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS + 1; i++)
+    /* Allocate accounts_database and initialize corresponding mutexes */
+    for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS; i++)
     {
         accounts_database[i] = (bank_account_t *)malloc(sizeof(bank_account_t));
         accounts_database[i]->account_id = EMPTY_ACCOUNT_ID;
+        pthread_mutex_init(&accounts_db_mutex[i], NULL);
     }
 
     /* Create admin account */
@@ -289,7 +286,7 @@ int main(int argc, char *argv[])
         sem_wait(&empty);
 
         /* Wait mutex */
-        pthread_mutex_lock(&mutex_request_queue);
+        pthread_mutex_lock(&req_queue_mutex);
         logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_ACCOUNT, request->value.header.pid);
 
         /* Append item */
@@ -300,7 +297,7 @@ int main(int argc, char *argv[])
         }
 
         /* Signal mutex */
-        pthread_mutex_unlock(&mutex_request_queue);
+        pthread_mutex_unlock(&req_queue_mutex);
         logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_ACCOUNT, request->value.header.pid);
 
         /* Signal full */
@@ -321,7 +318,7 @@ int main(int argc, char *argv[])
     }
 
     /* Free accounts database allocated memory */
-    for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS + 1; i++)
+    for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS; i++)
         free(accounts_database[i]);
 
     /* Close server fifo descriptor */

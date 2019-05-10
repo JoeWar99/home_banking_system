@@ -20,7 +20,7 @@ int valid_pwd(char * pwd) {
     return strlen(pwd) >= MIN_PASSWORD_LEN && strlen(pwd) <= MAX_PASSWORD_LEN;
 }
 
-int authenticate(char * pwd, bank_account_t * bank_account){
+int authenticate(const char * pwd, bank_account_t * bank_account){
 	if (bank_account->account_id == EMPTY_ACCOUNT_ID) return RC_ID_NOT_FOUND;
 	char hash[HASH_LEN + 1];
 	gen_hash(pwd, bank_account->salt, hash);
@@ -29,7 +29,7 @@ int authenticate(char * pwd, bank_account_t * bank_account){
 }
 
 
-int create_account(char * pwd, uint32_t account_id, uint32_t balance, bank_account_t * accounts_database[]){
+int create_account(const char * pwd, uint32_t account_id, uint32_t balance, bank_account_t * accounts_database[]){
 	if(gen_salt(accounts_database[account_id]->salt, SALT_LEN + 1, SALT_LEN) != 0)
 		return -1;
     if(gen_hash(pwd, accounts_database[account_id]->salt, accounts_database[account_id]->hash) != 0)

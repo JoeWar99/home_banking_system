@@ -1,6 +1,8 @@
 CC=gcc
 CFLAGS=-Wextra -pthread
 
+rebuild: clean all
+
 all: user_f server_f
 
 user_f: user.o user_parse.o crypto.o utilities.o account_utilities.o com_protocol.o log.o
