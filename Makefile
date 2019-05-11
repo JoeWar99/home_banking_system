@@ -2,8 +2,8 @@ CC=gcc
 CFLAGS = -Wall -Werror -Wextra
 LBLIBS = -pthread -lrt
 
-SRC_USER = user_f/user.c user_f/user_parse.c shared/crypto.c shared/utilities.c shared/account_utilities.c shared/com_protocol.c shared/log.c
-SRC_SERVER = server_f/server.c server_f/server_parse.c server_f/requests.c server_f/sync.c shared/crypto.c shared/utilities.c shared/queue.c shared/account_utilities.c shared/com_protocol.c shared/log.c
+SRC_USER = user_f/user.c user_f/user_parse.c shared/crypto.c shared/utilities.c shared/account_utilities.c shared/com_protocol.c shared/log.c shared/sync.c
+SRC_SERVER = server_f/server.c server_f/server_parse.c server_f/requests.c shared/sync.c shared/crypto.c shared/utilities.c shared/queue.c shared/account_utilities.c shared/com_protocol.c shared/log.c
 OBJ_USER = $(SRC_USER:.c=.o)
 OBJ_SERVER = $(SRC_SERVER:.c=.o)
 EXEC1 = server

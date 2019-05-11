@@ -3,11 +3,12 @@
 #include <string.h>
 
 #include "com_protocol.h"
-#include "../shared/utilities.h"
+#include "utilities.h"
+#include "sync.h"
+
 
 void init_request(tlv_request_t * full_request, int operation, int pid, int account_id, char * pwd, int op_delay, char ** req_args) {
 
-    //TODO verify req_size is okay
     uint32_t req_size = 0;
     // req_size += sizeof(full_request->length);
 
@@ -48,7 +49,7 @@ void init_request(tlv_request_t * full_request, int operation, int pid, int acco
     full_request->length = req_size;
 }
 
-int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, bank_account_t * accounts_database[]){
+int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, bank_account_t * accounts_database[], int n_threads){
 	//TODO verify rep_size is correct
 	uint32_t rep_size = 0;
 	// rep_size += sizeof(reply->length);
@@ -65,6 +66,8 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, bank_accou
 
 	// TODO: verificar o que enviar em caso de erro
 	/* Init value.union */
+	// TODO: verificar acitve_offices
+	int prov;
 	if(ret == 0){
 		switch(reply->type){
 			case OP_BALANCE:
@@ -72,10 +75,11 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, bank_accou
 				rep_size += sizeof(rep_balance_t);
 				break;
 			case OP_SHUTDOWN:
-				// TODO: fazer isto
-				reply->value.shutdown.active_offices = 69;
+				// TODO: confirmar que e o full
+				if (get_value_sem_empty(&prov) != 0)
+					return -1;
+				reply->value.shutdown.active_offices = n_threads - prov;
 				rep_size += sizeof(rep_shutdown_t);
-				printf("To be implemented\n");
 				break;
 			default:
 				break;

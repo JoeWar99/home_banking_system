@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include "requests.h"
-#include "sync.h"
+#include "../shared/sync.h"
 #include "../shared/constants.h"
 #include "../shared/account_utilities.h"
 
@@ -106,8 +106,7 @@ static int is_valid_transfer_request(const req_value_t * request_value, bank_acc
 		return RC_OTHER;
 	if(lock_accounts_db_mutex(dest_id) != 0)
 		return RC_OTHER;
-	printf("Aqui\n");
-
+		
 	/* Verify password */
 	if(authenticate(request_value->header.password, accounts_database[orig_id]) != 0)
 		ret_code = RC_LOGIN_FAIL;

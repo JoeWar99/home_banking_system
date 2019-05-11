@@ -2,8 +2,8 @@
 
 #include <pthread.h>
 #include <semaphore.h>
-#include "../shared/sope.h"
-#include "../shared/constants.h"
+#include "sope.h"
+#include "constants.h"
 
 static sem_t full, empty;
 static pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS];
@@ -52,9 +52,19 @@ int del_sync(){
 	return 0;
 }
 
+int get_value_sem_empty(int * result){
+	int ret;
+	if ((ret = sem_getvalue(&empty, result)) != 0)
+	{
+		perror("sem_get_value:");
+		return ret;
+	}
+	return 0;
+}
+
 int wait_sem_empty(pid_t sid){
 	int empty_aux, ret;
-	if ((ret = sem_getvalue(&empty, &empty_aux)) != 0) {
+	if ((ret = get_value_sem_empty(&empty_aux)) != 0) {
 		perror("sem_get_value:");
 		return ret;		
 	}
@@ -66,7 +76,7 @@ int wait_sem_empty(pid_t sid){
 
 int post_sem_empty(int balcony_id, pid_t sid){
 	int empty_aux, ret;
-	if ((ret = sem_getvalue(&empty, &empty_aux)) != 0)
+	if ((ret = get_value_sem_empty(&empty_aux)) != 0)
 	{
 		perror("sem_get_value:");
 		return ret;
@@ -81,9 +91,19 @@ int post_sem_empty(int balcony_id, pid_t sid){
 	return 0;
 }
 
+int get_value_sem_full(int * result){
+	int ret;
+	if ((ret = sem_getvalue(&full, result)) != 0)
+	{
+		perror("sem_get_value:");
+		return ret;
+	}
+	return 0;
+}
+
 int wait_sem_full(int balcony_id){
 	int full_aux, ret;
-	if ((ret = sem_getvalue(&full, &full_aux)) != 0)
+	if ((ret = get_value_sem_full(&full_aux)) != 0)
 	{
 		perror("sem_get_value:");
 		return ret;
@@ -97,7 +117,7 @@ int wait_sem_full(int balcony_id){
 
 int post_sem_full(pid_t sid){
 	int full_aux, ret;
-	if ((ret = sem_getvalue(&full, &full_aux)) != 0){
+	if ((ret = get_value_sem_full(&full_aux)) != 0){
 		perror("sem_get_value:");
 		return ret;
 	}

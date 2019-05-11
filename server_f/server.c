@@ -14,20 +14,17 @@
 #include "../shared/types.h"
 #include "../shared/crypto.h"
 #include "../shared/queue.h"
+#include "../shared/sync.h"
 #include "../shared/account_utilities.h"
 #include "../shared/com_protocol.h"
 #include "../shared/sope.h"
 #include "server_parse.h"
 #include "requests.h"
-#include "sync.h"
 
-//sem_t full, empty;
 
 bank_account_t *accounts_database[MAX_BANK_ACCOUNTS];
-//pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS];
-
+int n_threads, balcony_open = 1;
 queue_t *request_queue;
-//pthread_mutex_t req_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *balconies(void *arg)
 {
@@ -47,10 +44,11 @@ void *balconies(void *arg)
     * 	3) Se válido executar pedido
     * 	4) Responder ao cliente    
     */
-    while (1)
+    while (balcony_open)
     {
 		
         /* Wait full */
+		// TODO: change to trywait (??)
 		if((ret = wait_sem_full(id_thread)) != 0){
 			fprintf(stderr, "wait_sem_full: error %d\n", ret);
             exit(RC_OTHER);
@@ -115,6 +113,7 @@ void *balconies(void *arg)
                 break;
             case OP_SHUTDOWN:
                 // printf("shutdown\n");
+				balcony_open = 0;
                 /* if (fchmod(secure_svr, 0444) != 0)
                 {
                     perror("fchmod: error altering server fifo permissions");*/
@@ -141,7 +140,7 @@ void *balconies(void *arg)
 			fprintf(stderr, "lock_accounts_db_mutex: error %d\n", ret);
             exit(RC_OTHER);
 		}
-        init_reply(&request_reply, first_request, req_ret, accounts_database);
+        init_reply(&request_reply, first_request, req_ret, accounts_database, n_threads);
 		if((ret = unlock_accounts_db_mutex(first_request->value.header.account_id)) != 0){
 			fprintf(stderr, "lock_accounts_db_mutex: error %d\n", ret);
             exit(RC_OTHER);
@@ -168,6 +167,7 @@ void *balconies(void *arg)
     }
 
     logBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread);
+	return NULL;
 }
 
 int main(int argc, char *argv[])
@@ -181,7 +181,7 @@ int main(int argc, char *argv[])
     /* Generate new random seed */
     srand(time(NULL));
 
-    int n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
+    n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
     char *pwd = argv[2];
     int ret;
 
@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
         exit(RC_SRV_DOWN);
     }
 
-    while (1)
+    while (balcony_open)
     {
 
         /* Produce item */
@@ -296,6 +296,18 @@ int main(int argc, char *argv[])
             exit(RC_OTHER);
 		}
     }
+
+	// TODO: not finished yet
+	if (fchmod(secure_svr, 0444) != 0){
+		perror("fchmod: error altering server fifo permissions");
+		exit(RC_OTHER);
+	}	
+
+	for(int i = 0; i < n_threads; i++){
+		printf("Get %d\n", i);
+        if(pthread_join(thread_tid[i], NULL) != 0)
+			fprintf(stderr, "Error joininig thread %d\n", i);
+	}
 
     /* Delete requests queue */
     if (del_queue(request_queue) != 0)
