@@ -1,10 +1,11 @@
 #include <stdio.h>
 #include <pthread.h>
 #include "requests.h"
+#include "sync.h"
 #include "../shared/constants.h"
 #include "../shared/account_utilities.h"
 
-extern pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS]; 
+//extern pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS]; 
 
 static int is_valid_create_request(const req_value_t * request_value, bank_account_t * accounts_database[]);
 
@@ -34,27 +35,34 @@ int create_request(const req_value_t * request_value, bank_account_t * accounts_
 	int ret_code = 0;
 	uint32_t create_id = request_value->create.account_id;
 
-	pthread_mutex_lock(&accounts_db_mutex[create_id]);
+	if(lock_accounts_db_mutex(create_id) != 0)
+		return -2;
 
 	if(create_account(request_value->create.password, create_id, request_value->create.balance, accounts_database) != 0)
 		ret_code = -1;
 
-	pthread_mutex_unlock(&accounts_db_mutex[create_id]);
+	if(unlock_accounts_db_mutex(create_id) != 0)
+		return -2;
 
-	return ret_code;;
+	return ret_code;
 }
 
 int transfer_request(const req_value_t * request_value, bank_account_t * accounts_database[]){
 	uint32_t orig_id = request_value->header.account_id;
 	uint32_t dest_id = request_value->transfer.account_id;
 
-	pthread_mutex_lock(&accounts_db_mutex[orig_id]);
+	if(lock_accounts_db_mutex(orig_id) != 0)
+		return -1;
 	accounts_database[orig_id]->balance -= request_value->transfer.amount;
-	pthread_mutex_unlock(&accounts_db_mutex[orig_id]);
+	if(unlock_accounts_db_mutex(orig_id) != 0)
+		return -1;
 
-	pthread_mutex_lock(&accounts_db_mutex[dest_id]);
+	if(lock_accounts_db_mutex(dest_id) != 0)
+		return -2;
 	accounts_database[dest_id]->balance += request_value->transfer.amount;
-	pthread_mutex_unlock(&accounts_db_mutex[dest_id]);
+	if(unlock_accounts_db_mutex(dest_id) != 0)
+		return -2;
+
 	return 0;
 }
 
@@ -63,8 +71,10 @@ static int is_valid_create_request(const req_value_t * request_value, bank_accou
 	uint32_t orig_id = request_value->header.account_id;
 	uint32_t create_id = request_value->create.account_id;
 	
-	pthread_mutex_lock(&accounts_db_mutex[orig_id]);
-	pthread_mutex_lock(&accounts_db_mutex[create_id]);
+	if(lock_accounts_db_mutex(orig_id) != 0)
+		return RC_OTHER;
+	if(lock_accounts_db_mutex(create_id) != 0)
+		return RC_OTHER;
 
 	/* Verify password */
 	if(authenticate(request_value->header.password, accounts_database[orig_id]) != 0)
@@ -80,9 +90,10 @@ static int is_valid_create_request(const req_value_t * request_value, bank_accou
 
 	/* Parameter verification done in user_parse */
 	
-	pthread_mutex_unlock(&accounts_db_mutex[create_id]);
-	pthread_mutex_unlock(&accounts_db_mutex[orig_id]);
-
+	if(unlock_accounts_db_mutex(create_id) != 0)
+		return RC_OTHER;
+	if(unlock_accounts_db_mutex(orig_id) != 0)
+		return RC_OTHER;
 	return ret_code;
 }
 
@@ -91,8 +102,11 @@ static int is_valid_transfer_request(const req_value_t * request_value, bank_acc
 	uint32_t orig_id = request_value->header.account_id;
 	uint32_t dest_id = request_value->transfer.account_id;
 
-	pthread_mutex_lock(&accounts_db_mutex[orig_id]);
-	pthread_mutex_lock(&accounts_db_mutex[dest_id]);
+	if(lock_accounts_db_mutex(orig_id) != 0)
+		return RC_OTHER;
+	if(lock_accounts_db_mutex(dest_id) != 0)
+		return RC_OTHER;
+	printf("Aqui\n");
 
 	/* Verify password */
 	if(authenticate(request_value->header.password, accounts_database[orig_id]) != 0)
@@ -118,8 +132,10 @@ static int is_valid_transfer_request(const req_value_t * request_value, bank_acc
 	else if(accounts_database[dest_id]->balance + request_value->transfer.amount > MAX_BALANCE)
 		ret_code = RC_TOO_HIGH;
 
-	pthread_mutex_unlock(&accounts_db_mutex[dest_id]);
-	pthread_mutex_unlock(&accounts_db_mutex[orig_id]);
+	if(unlock_accounts_db_mutex(dest_id) != 0)
+		return RC_OTHER;
+	if(unlock_accounts_db_mutex(orig_id) != 0)
+		return RC_OTHER;
 
 	return ret_code;
 }
@@ -128,7 +144,8 @@ static int is_valid_balance_request(const req_value_t * request_value, bank_acco
 	int ret_code = RC_OK;
 	uint32_t orig_id = request_value->header.account_id;
 
-	pthread_mutex_lock(&accounts_db_mutex[orig_id]);
+	if(lock_accounts_db_mutex(orig_id) != 0)
+		return RC_OTHER;
 
 	/* Verify password */
 	if(authenticate(request_value->header.password, accounts_database[orig_id]) != 0)
@@ -138,7 +155,8 @@ static int is_valid_balance_request(const req_value_t * request_value, bank_acco
 	else if(orig_id == ADMIN_ACCOUNT_ID)
 		ret_code = RC_OP_NALLOW;
 
-	pthread_mutex_unlock(&accounts_db_mutex[orig_id]);
+	if(unlock_accounts_db_mutex(orig_id) != 0)
+		return RC_OTHER;
 
 	return ret_code;
 }
@@ -147,7 +165,8 @@ static int is_valid_shutdown_request(const req_value_t * request_value, bank_acc
 	int ret_code = RC_OK;
 	uint32_t orig_id = request_value->header.account_id;
 
-	pthread_mutex_lock(&accounts_db_mutex[orig_id]);
+	if(lock_accounts_db_mutex(orig_id) != 0)
+		return RC_OTHER;
 
 	/* Verify password */
 	if(authenticate(request_value->header.password, accounts_database[orig_id]) != 0)
@@ -157,7 +176,8 @@ static int is_valid_shutdown_request(const req_value_t * request_value, bank_acc
 	else if(orig_id != ADMIN_ACCOUNT_ID)
 		ret_code = RC_OP_NALLOW;
 
-	pthread_mutex_unlock(&accounts_db_mutex[orig_id]);
+	if(unlock_accounts_db_mutex(orig_id) != 0)
+		return RC_OTHER;
 
 	return ret_code;
 }

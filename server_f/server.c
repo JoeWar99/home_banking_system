@@ -19,22 +19,23 @@
 #include "../shared/sope.h"
 #include "server_parse.h"
 #include "requests.h"
+#include "sync.h"
 
-sem_t full, empty;
+//sem_t full, empty;
 
 bank_account_t *accounts_database[MAX_BANK_ACCOUNTS];
-pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS];
+//pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS];
 
 queue_t *request_queue;
-pthread_mutex_t req_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
+//pthread_mutex_t req_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *balconies(void *arg)
 {
     int id_thread = *(int *)arg;
     int pid_thread = pthread_self();
-    int ret;
-    int full_aux;
-    int empty_aux;
+    int ret, req_ret;
+    // int full_aux;
+    // int empty_aux;
     tlv_request_t *first_request;
 
     logBankOfficeOpen(STDOUT_FILENO, id_thread, pid_thread);
@@ -48,19 +49,19 @@ void *balconies(void *arg)
     */
     while (1)
     {
-        if (sem_getvalue(&full, &full_aux) != 0)
-        {
-            perror("sem_get_value:");
-            exit(RC_OTHER);
-        }
-
+		
         /* Wait full */
-        logSyncMechSem(STDOUT_FILENO, id_thread, SYNC_OP_SEM_WAIT, SYNC_ROLE_CONSUMER, 0, full_aux);
-        sem_wait(&full);
+		if((ret = wait_sem_full(id_thread)) != 0){
+			fprintf(stderr, "wait_sem_full: error %d\n", ret);
+            exit(RC_OTHER);
+		}
 
         /* Wait mutex */
-        pthread_mutex_lock(&req_queue_mutex);
-        logSyncMech(STDOUT_FILENO, id_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_CONSUMER, 0);
+		// TODO: ver este hardcoded 0 que estava
+		if((ret = lock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, 0)) != 0){
+			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
 
         /* Take item */
         first_request = (tlv_request_t *)queue_front(request_queue);
@@ -77,27 +78,24 @@ void *balconies(void *arg)
         }
 
         /* Signal mutex */
-        pthread_mutex_unlock(&req_queue_mutex);
-        logSyncMech(STDOUT_FILENO, id_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_CONSUMER, first_request->value.header.pid);
+		if((ret = unlock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, first_request->value.header.pid)) != 0){
+			fprintf(stderr, "unlock_queue_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
 
         /* Signal empty */
-        sem_post(&empty);
-        if (sem_getvalue(&empty, &empty_aux) != 0)
-        {
-            perror("sem_get_value:");
+		if((ret = post_sem_empty(id_thread, first_request->value.header.pid)) != 0){
+			fprintf(stderr, "post_sem_empty: error %d\n", ret);
             exit(RC_OTHER);
-        }
-        logSyncMechSem(STDOUT_FILENO, id_thread, SYNC_OP_SEM_POST, SYNC_ROLE_CONSUMER, first_request->value.header.pid, empty_aux);
+		}
 
-
-        // TODO: change to TID later
-        if (logRequest(STDOUT_FILENO, 6969, first_request) < 0)
+        if (logRequest(STDOUT_FILENO, id_thread, first_request) < 0)
         {
             fprintf(stderr, "logRequest: error writing request to stdout\n");
         //    exit(RC_OTHER);
         }
 
-        if ((ret = is_valid_request(first_request, accounts_database)) == 0)
+        if ((req_ret = is_valid_request(first_request, accounts_database)) == 0)
         {
             switch (first_request->type)
             {
@@ -138,11 +136,17 @@ void *balconies(void *arg)
         }
 
         tlv_reply_t request_reply;
-        pthread_mutex_lock(&accounts_db_mutex[first_request->value.header.account_id]);
-        init_reply(&request_reply, first_request, ret, accounts_database);
-        pthread_mutex_unlock(&accounts_db_mutex[first_request->value.header.account_id]);
+		
+		if((ret = lock_accounts_db_mutex(first_request->value.header.account_id)) != 0){
+			fprintf(stderr, "lock_accounts_db_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+        init_reply(&request_reply, first_request, req_ret, accounts_database);
+		if((ret = unlock_accounts_db_mutex(first_request->value.header.account_id)) != 0){
+			fprintf(stderr, "lock_accounts_db_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
 
-        // TODO: change to TID later
         if (logReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
         {
             fprintf(stderr, "logRequest: error writing reply to stdout\n");
@@ -179,7 +183,8 @@ int main(int argc, char *argv[])
 
     int n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
     char *pwd = argv[2];
-    
+    int ret;
+
     if(!valid_args(n_threads, pwd)) {
         fprintf(stderr, "Invalid arguments given\n");
         exit(RC_OTHER);
@@ -192,27 +197,12 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-    /* TODO what is this??? maybe define a macro */
-    int id_main_thread = 0;
-
-    /* Initialize FULL semaphore with 0 */
-    if (sem_init(&full, SHARED_SEM, 0) != 0)
-    {
-        perror("sem_init: error initializing full semaphore");
+	if((ret = init_sync(n_threads)) != 0){
+		fprintf(stderr, "init_sync: error: %d\n", ret);
         exit(RC_OTHER);
-    }
+	}
 
-    logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, id_main_thread, 0);
-
-    /* Initialize EMPTY semaphore with number of threads */
-    if (sem_init(&empty, SHARED_SEM, n_threads) != 0)
-    {
-        perror("sem_init: error initializing empty semaphore");
-        exit(RC_OTHER);
-    }
-
-    logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, id_main_thread, n_threads);
-
+    
     /* Create server fifo */
     if (mkfifo(SERVER_FIFO_PATH, 0660) < 0)
     {
@@ -236,16 +226,14 @@ int main(int argc, char *argv[])
         }
     }
 
-    /* Allocate accounts_database and initialize corresponding mutexes */
+    /* Allocate accounts_database */
     for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS; i++)
     {
         accounts_database[i] = (bank_account_t *)malloc(sizeof(bank_account_t));
         accounts_database[i]->account_id = EMPTY_ACCOUNT_ID;
-        pthread_mutex_init(&accounts_db_mutex[i], NULL);
     }
 
     /* Create admin account */
-    int ret;
     if ((ret = create_account(pwd, ADMIN_ACCOUNT_ID, 0, accounts_database)) != 0)
     {
         fprintf(stderr, "create_account: failed to create ADMIN_ACCOUNT. Error: %d\n", ret);
@@ -260,8 +248,6 @@ int main(int argc, char *argv[])
         exit(RC_SRV_DOWN);
     }
 
-    int full_aux;
-    int empty_aux;
     while (1)
     {
 
@@ -273,26 +259,24 @@ int main(int argc, char *argv[])
             break;
         }
 
-        if (logRequest(STDOUT_FILENO, id_main_thread, request) < 0)
+        if (logRequest(STDOUT_FILENO, MAIN_THREAD_ID, request) < 0)
         {
             fprintf(stderr, "logRequest: error writing request to stdout\n");
             exit(RC_OTHER);
         }
 
-        if (sem_getvalue(&empty, &empty_aux) != 0)
-        {
-            perror("sem_get_value:");
-            exit(RC_OTHER);
-        }
-
         /* Wait empty */
-        logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_WAIT, SYNC_ROLE_PRODUCER, request->value.header.pid, empty_aux);
-        sem_wait(&empty);
+		if((ret = wait_sem_empty(request->value.header.pid)) != 0){
+			fprintf(stderr, "wait_sem_empty: error %d\n", ret);
+            exit(RC_OTHER);
+		}
 
         /* Wait mutex */
-        pthread_mutex_lock(&req_queue_mutex);
-        logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_LOCK, SYNC_ROLE_ACCOUNT, request->value.header.pid);
-
+		if((ret = lock_queue_mutex(MAIN_THREAD_ID, SYNC_ROLE_ACCOUNT, request->value.header.pid)) != 0){
+			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+       
         /* Append item */
         if (queue_push(request_queue, request) != 0)
         {
@@ -301,17 +285,16 @@ int main(int argc, char *argv[])
         }
 
         /* Signal mutex */
-        pthread_mutex_unlock(&req_queue_mutex);
-        logSyncMech(STDOUT_FILENO, id_main_thread, SYNC_OP_MUTEX_UNLOCK, SYNC_ROLE_ACCOUNT, request->value.header.pid);
-
-        /* Signal full */
-        sem_post(&full);
-        if (sem_getvalue(&full, &full_aux) != 0)
-        {
-            perror("sem_get_value:");
+		if((ret = unlock_queue_mutex(MAIN_THREAD_ID, SYNC_ROLE_ACCOUNT, request->value.header.pid)) != 0){
+			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
             exit(RC_OTHER);
-        }
-        logSyncMechSem(STDOUT_FILENO, id_main_thread, SYNC_OP_SEM_POST, SYNC_ROLE_PRODUCER, request->value.header.pid, full_aux);
+		}
+        
+        /* Signal full */
+		if((ret = post_sem_full(request->value.header.pid)) != 0){
+			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
     }
 
     /* Delete requests queue */
@@ -320,6 +303,11 @@ int main(int argc, char *argv[])
         fprintf(stderr, "del_queue: error deleting queue\n");
         exit(RC_OTHER);
     }
+
+	if(del_sync() != 0){
+		fprintf(stderr, "del_sync: error %d\n", ret);
+        exit(RC_OTHER);
+	}
 
     /* Free accounts database allocated memory */
     for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS; i++)
