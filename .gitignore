@@ -4,3 +4,4 @@ user
 .vscode/
 *.pdf
 *.d
+*log.txt

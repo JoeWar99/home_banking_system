@@ -12,9 +12,8 @@
 #include "../shared/constants.h"
 #include "../shared/types.h"
 #include "../shared/com_protocol.h"
-#include "user_parse.h"
-
 #include "../shared/sope.h"
+#include "user_parse.h"
 
 int user_fifo;
 int secure_svr;
@@ -99,6 +98,14 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
+    /* Open log file and point STDOUT to it */
+    int logfile;
+    if ((logfile = open(USER_LOGFILE, O_WRONLY | O_CREAT | O_APPEND, 0644)) == -1) {
+        perror("Open user log file");
+        exit(RC_OTHER);
+    }
+    dup2(logfile, STDOUT_FILENO);
+
     /* Create user specific fifo */
     char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
     init_secure_fifo_name(secure_fifo_name, pid);
@@ -115,7 +122,6 @@ int main(int argc, char *argv[])
     init_request(&full_request, operation, pid, account_id, pwd, op_delay, req_args);
 
     /* Open server fifo */
-    //   int secure_svr;
     if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY)) == -1)
     {
         perror("open: server is not working 404 error");
@@ -132,6 +138,7 @@ int main(int argc, char *argv[])
 	// TODO: isto nunca e usado!! ver melhor
     //int error_due_to_alarm = 0;
 
+    /* Set alarm */
     alarm(FIFO_TIMEOUT_SECS);
 
     if (logRequest(STDOUT_FILENO, pid, &full_request) < 0)
@@ -141,8 +148,6 @@ int main(int argc, char *argv[])
     }
 
     /* Open user specific fifo */
-    ///  int user_fifo;
-
     if ((user_fifo = open(secure_fifo_name, O_RDONLY)) == -1)
     {
         perror("open");

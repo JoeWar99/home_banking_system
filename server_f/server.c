@@ -179,6 +179,14 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
+    /* Open log file and point STDOUT to it */
+    int logfile;
+    if ((logfile = open(SERVER_LOGFILE, O_WRONLY | O_CREAT | O_APPEND, 0644)) == -1) {
+        perror("Open server log file");
+        exit(RC_OTHER);
+    }
+    dup2(logfile, STDOUT_FILENO);
+
     /* Initialize requests queue */
     if ((request_queue = init_queue()) == NULL)
     {
