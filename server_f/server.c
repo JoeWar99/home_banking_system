@@ -54,6 +54,9 @@ void *balconies(void *arg)
             exit(RC_OTHER);
 		}
 
+		if(!balcony_open)
+			break;
+
         /* Wait mutex */
 		// TODO: ver este hardcoded 0 que estava
 		if((ret = lock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, 0)) != 0){
@@ -116,8 +119,26 @@ void *balconies(void *arg)
                 break;
             case OP_SHUTDOWN:
                 // printf("shutdown\n");
-				// TODO: atraso aqui
+				
+				// TODO: ver se atraso e mesmo aqui ou em baixo
+				usleep(first_request->value.header.op_delay_ms * 1000);
+				logDelay(STDOUT_FILENO, id_thread, first_request->value.header.op_delay_ms);
+
 				balcony_open = 0;
+				// Enviar mensagem para destravar o main
+				int secure_svr;
+				if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY)) == -1)
+				{
+					perror("open: server is not working 404 error");
+					exit(RC_SRV_DOWN);
+				}
+				/* Write request */
+				if (write_request(secure_svr, first_request) != 0)
+				{
+					fprintf(stderr, "write_request: error writing  request to server\n");
+					exit(RC_OTHER);
+				}
+
                 /* if (fchmod(secure_svr, 0444) != 0)
                 {
                     perror("fchmod: error altering server fifo permissions");*/
@@ -256,6 +277,9 @@ int main(int argc, char *argv[])
             break;
         }
 
+		if(!balcony_open)
+			break;
+
         if (logRequest(STDOUT_FILENO, MAIN_THREAD_ID, request) < 0)
         {
             fprintf(stderr, "logRequest: error writing request to stdout\n");
@@ -294,13 +318,13 @@ int main(int argc, char *argv[])
 		}
     }
 
-	// TODO: not finished yet
 	if (fchmod(secure_svr, 0444) != 0){
 		perror("fchmod: error altering server fifo permissions");
 		exit(RC_OTHER);
 	}	
 
 	for(int i = 0; i < n_threads; i++){
+		post_sem_full(MAIN_THREAD_ID);
 		printf("Get %d\n", i);
         if(pthread_join(thread_tid[i], NULL) != 0)
 			fprintf(stderr, "Error joininig thread %d\n", i);
