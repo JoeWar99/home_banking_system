@@ -65,11 +65,11 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int n_thre
 	int prov;
 	if(ret == 0){
 		switch(reply->type){
-			case OP_BALANCE:
-				
+			case OP_BALANCE:				
 				reply->value.balance.balance = balance;
 				rep_size += sizeof(rep_balance_t);
 				break;
+
 			case OP_SHUTDOWN:
 				// TODO: confirmar que e o full
 				if (get_value_sem_empty(&prov) != 0)
@@ -77,12 +77,53 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int n_thre
 				reply->value.shutdown.active_offices = n_threads - prov;
 				rep_size += sizeof(rep_shutdown_t);
 				break;
+
 			default:
 				break;
 		}
 	}
 	if(reply->type == OP_TRANSFER){
 		reply->value.transfer.balance = balance;
+		rep_size += sizeof(rep_transfer_t);
+	}
+
+	/* Init length */
+	reply->length = rep_size;
+	return 0;
+}
+
+int init_reply_error(tlv_reply_t * reply, tlv_request_t * request, int ret) {
+	uint32_t rep_size = 0;
+
+	/* Init type */
+	reply->type = request->type;
+
+	/* Init value.header */
+	reply->value.header.account_id = request->value.header.account_id;
+	reply->value.header.ret_code = ret;
+	rep_size += sizeof(rep_header_t);
+
+	// TODO: verificar o que enviar em caso de erro
+	/* Init value.union */
+	// TODO: verificar acitve_offices
+	if(ret == 0){
+		switch(reply->type){
+			case OP_BALANCE:				
+				reply->value.balance.balance = 0;
+				rep_size += sizeof(rep_balance_t);
+				break;
+
+			case OP_SHUTDOWN:
+				reply->value.shutdown.active_offices = 0;
+				rep_size += sizeof(rep_shutdown_t);
+				break;
+
+			default:
+				break;
+		}
+	}
+	if(reply->type == OP_TRANSFER){
+		reply->value.transfer.balance = 0;
 		rep_size += sizeof(rep_transfer_t);
 	}
 

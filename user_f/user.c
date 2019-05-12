@@ -17,14 +17,40 @@
 
 int user_fifo;
 int secure_svr;
-int open_user_fifo_failed = 1;
 
-void exit_user_process()
+int opened_user_fifo = 0;
+int opened_srv_fifo = 0;
+int logged_request = 0;
+int logged_reply = 0;
+
+tlv_request_t full_request;
+tlv_reply_t request_reply;
+
+void exit_user_process(ret_code_t ret)
 {
+    int pid = getpid();
     char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
-    init_secure_fifo_name(secure_fifo_name, getpid());
+    init_secure_fifo_name(secure_fifo_name, pid);
+
+    if (!logged_request) 
+    {
+        if (logRequest(STDOUT_FILENO, pid, &full_request) < 0)
+        {
+            fprintf(stderr, "logRequest: error writing request to stdout\n");
+            exit(RC_OTHER);
+        }
+    }
+
+    if (!logged_reply) 
+    {
+        if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
+        {
+            fprintf(stderr, "logRequest: error writing reply to stdout\n");
+            exit(RC_OTHER);
+        }
+    }
    
-    if (open_user_fifo_failed == 0)
+    if (opened_srv_fifo)
     {
         if (close(secure_svr) != 0)
         {
@@ -33,10 +59,12 @@ void exit_user_process()
         }
     }
 
-    if (close(user_fifo) != 0)
-    {
-        perror("close: error closing down user fifo");
-        exit(RC_OTHER);
+    if (opened_user_fifo) {
+        if (close(user_fifo) != 0)
+        {
+            perror("close: error closing down user fifo");
+            exit(RC_OTHER);
+        }
     }
 
     /* Unlink user specific fifo */
@@ -45,13 +73,15 @@ void exit_user_process()
         perror("unlink: error unlinking user fifo");
         exit(RC_OTHER);
     }
+
+    exit(ret);
 }
 
-//void sigalarm_handler(int signo)
 void sigalarm_handler()
 {
-    exit_user_process();
-    exit(RC_SRV_TIMEOUT);
+    // TODO faltam os frees quando sai por causa do alarme
+    init_reply_error(&request_reply, &full_request, RC_SRV_TIMEOUT);
+    exit_user_process(RC_SRV_TIMEOUT);
 }
 
 int main(int argc, char *argv[])
@@ -106,6 +136,7 @@ int main(int argc, char *argv[])
     }
     dup2(logfile, STDOUT_FILENO);
 
+
     /* Create user specific fifo */
     char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
     init_secure_fifo_name(secure_fifo_name, pid);
@@ -118,15 +149,22 @@ int main(int argc, char *argv[])
         }
     }
 
-    tlv_request_t full_request;
     init_request(&full_request, operation, pid, account_id, pwd, op_delay, req_args);
 
     /* Open server fifo */
     if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY)) == -1)
     {
-        perror("open: server is not working 404 error");
-        exit(RC_SRV_DOWN);
+        /* SERVER DOWN */
+        init_reply_error(&request_reply, &full_request, RC_SRV_DOWN);
+
+        for (int i = 0; i < req_arg_count; i++)
+        {
+            free(req_args[i]);
+        }
+
+        exit_user_process(RC_SRV_DOWN);
     }
+    opened_srv_fifo = 1;
 
     /* Write request */
     if (write_request(secure_svr, &full_request) != 0)
@@ -146,34 +184,39 @@ int main(int argc, char *argv[])
         fprintf(stderr, "logRequest: error writing request to stdout\n");
         exit(RC_OTHER);
     }
+    logged_request = 1;
 
     /* Open user specific fifo */
     if ((user_fifo = open(secure_fifo_name, O_RDONLY)) == -1)
     {
-        perror("open");
-        exit(RC_USR_DOWN);
-    }
+        /* USER DOWN */
+        init_reply_error(&request_reply, &full_request, RC_USR_DOWN);
 
-    open_user_fifo_failed = 0;
+        for (int i = 0; i < req_arg_count; i++)
+        {
+            free(req_args[i]);
+        }
+
+        exit_user_process(RC_USR_DOWN);
+    }
+    opened_user_fifo = 1;
+
 
     /* Read server reply */
-    tlv_reply_t request_reply;
-
-    if (read_reply(user_fifo, &request_reply) == 0)
-    {
-        alarm(0);
-    }
-    else
+    if (read_reply(user_fifo, &request_reply) != 0)
     {
         fprintf(stderr, "read_reply: error reading reply from fifo\n");
         exit(RC_OTHER);
     }
+    
+    alarm(0);
 
     if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
     {
         fprintf(stderr, "logRequest: error writing reply to stdout\n");
         exit(RC_OTHER);
     }
+    logged_reply = 1;
 
     /* Free alocated memory */
     for (int i = 0; i < req_arg_count; i++)
@@ -181,7 +224,5 @@ int main(int argc, char *argv[])
         free(req_args[i]);
     }
 
-    exit_user_process();
-
-    return RC_OK;
+    exit_user_process(RC_OK);
 }
