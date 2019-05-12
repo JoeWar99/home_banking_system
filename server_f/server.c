@@ -93,12 +93,13 @@ void *balconies(void *arg)
         //    exit(RC_OTHER);
         }
 
+		uint32_t balance;
         if ((req_ret = is_valid_request(first_request, accounts_database)) == 0)
-        {
+        { 
             switch (first_request->type)
             {
             case OP_CREATE_ACCOUNT:
-                if (create_request(&first_request->value, accounts_database) != 0)
+                if (create_request(&first_request->value, accounts_database, id_thread) != 0)
                 {
                     fprintf(stderr, "create_request: failed to create account.\n");
                     //   exit(RC_OTHER);
@@ -106,13 +107,16 @@ void *balconies(void *arg)
                 break;
             case OP_TRANSFER:
                 // printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
-                transfer_request(&first_request->value, accounts_database);
+                if(transfer_request(&first_request->value, accounts_database, &balance, id_thread) != 0)
+                    fprintf(stderr, "transfer_request: failed to perform transfer request.\n");
                 break;
             case OP_BALANCE:
-                // printf("balance\n");
+                if(balance_request(&first_request->value, accounts_database, &balance, id_thread) != 0)
+                    fprintf(stderr, "balance_request: failed to perform balance request.\n");
                 break;
             case OP_SHUTDOWN:
                 // printf("shutdown\n");
+				// TODO: atraso aqui
 				balcony_open = 0;
                 /* if (fchmod(secure_svr, 0444) != 0)
                 {
@@ -136,16 +140,9 @@ void *balconies(void *arg)
 
         tlv_reply_t request_reply;
 		
-		if((ret = lock_accounts_db_mutex(first_request->value.header.account_id)) != 0){
-			fprintf(stderr, "lock_accounts_db_mutex: error %d\n", ret);
-            exit(RC_OTHER);
-		}
-        init_reply(&request_reply, first_request, req_ret, accounts_database, n_threads);
-		if((ret = unlock_accounts_db_mutex(first_request->value.header.account_id)) != 0){
-			fprintf(stderr, "lock_accounts_db_mutex: error %d\n", ret);
-            exit(RC_OTHER);
-		}
-
+		// TODO: tirei daqui os mutex_db ver se esta bem
+        init_reply(&request_reply, first_request, req_ret, n_threads, balance);
+		
         if (logReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
         {
             fprintf(stderr, "logRequest: error writing reply to stdout\n");
@@ -235,7 +232,7 @@ int main(int argc, char *argv[])
 
     /* Create admin account */
     if ((ret = create_account(pwd, ADMIN_ACCOUNT_ID, 0, accounts_database)) != 0)
-    {
+	{
         fprintf(stderr, "create_account: failed to create ADMIN_ACCOUNT. Error: %d\n", ret);
         exit(RC_OTHER);
     }

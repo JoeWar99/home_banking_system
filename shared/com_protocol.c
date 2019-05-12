@@ -49,7 +49,7 @@ void init_request(tlv_request_t * full_request, int operation, int pid, int acco
     full_request->length = req_size;
 }
 
-int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, bank_account_t * accounts_database[], int n_threads){
+int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int n_threads, uint32_t balance){
 	//TODO verify rep_size is correct
 	uint32_t rep_size = 0;
 	// rep_size += sizeof(reply->length);
@@ -71,7 +71,8 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, bank_accou
 	if(ret == 0){
 		switch(reply->type){
 			case OP_BALANCE:
-				reply->value.balance.balance = accounts_database[request->value.header.account_id]->balance;
+				
+				reply->value.balance.balance = balance;
 				rep_size += sizeof(rep_balance_t);
 				break;
 			case OP_SHUTDOWN:
@@ -86,7 +87,7 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, bank_accou
 		}
 	}
 	if(reply->type == OP_TRANSFER){
-		reply->value.transfer.balance = accounts_database[request->value.header.account_id]->balance;
+		reply->value.transfer.balance = balance;
 		rep_size += sizeof(rep_transfer_t);
 	}
 

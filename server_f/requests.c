@@ -1,9 +1,11 @@
 #include <stdio.h>
 #include <pthread.h>
+#include <unistd.h>
 #include "requests.h"
 #include "../shared/sync.h"
 #include "../shared/constants.h"
 #include "../shared/account_utilities.h"
+#include "../shared/sope.h"
 
 //extern pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS]; 
 
@@ -31,12 +33,16 @@ int is_valid_request(tlv_request_t * request, bank_account_t * accounts_database
 	}
 }
 
-int create_request(const req_value_t * request_value, bank_account_t * accounts_database[]){
+int create_request(const req_value_t * request_value, bank_account_t * accounts_database[], int id){
 	int ret_code = 0;
 	uint32_t create_id = request_value->create.account_id;
 
+	// TODO: passar para dentro do create account para server tbm usar isto?? n sei se gosto
 	if(lock_accounts_db_mutex(create_id) != 0)
 		return -2;
+	
+	usleep(request_value->header.op_delay_ms * 1000);
+	logSyncDelay(STDOUT_FILENO, id, create_id, request_value->header.op_delay_ms);
 
 	if(create_account(request_value->create.password, create_id, request_value->create.balance, accounts_database) != 0)
 		ret_code = -1;
@@ -47,22 +53,46 @@ int create_request(const req_value_t * request_value, bank_account_t * accounts_
 	return ret_code;
 }
 
-int transfer_request(const req_value_t * request_value, bank_account_t * accounts_database[]){
+int transfer_request(const req_value_t * request_value, bank_account_t * accounts_database[], uint32_t * final_balance, int id){
 	uint32_t orig_id = request_value->header.account_id;
 	uint32_t dest_id = request_value->transfer.account_id;
 
 	if(lock_accounts_db_mutex(orig_id) != 0)
 		return -1;
+	
+	usleep(request_value->header.op_delay_ms * 1000);
+	logSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms);
+	
 	accounts_database[orig_id]->balance -= request_value->transfer.amount;
+	*final_balance = accounts_database[orig_id]->balance;
+	
 	if(unlock_accounts_db_mutex(orig_id) != 0)
 		return -1;
 
+
 	if(lock_accounts_db_mutex(dest_id) != 0)
 		return -2;
+	
+	usleep(request_value->header.op_delay_ms * 1000);
+	logSyncDelay(STDOUT_FILENO, id, dest_id, request_value->header.op_delay_ms);
+	
 	accounts_database[dest_id]->balance += request_value->transfer.amount;
+	
 	if(unlock_accounts_db_mutex(dest_id) != 0)
 		return -2;
 
+	return 0;
+}
+
+int balance_request(const req_value_t * request_value, bank_account_t * accounts_database[], uint32_t * final_balance, int id){
+	uint32_t orig_id = request_value->header.account_id;
+	if(lock_accounts_db_mutex(orig_id) != 0)
+		return -1;
+	usleep(request_value->header.op_delay_ms * 1000);
+	logSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms);
+	*final_balance = accounts_database[orig_id]->balance;
+	if(unlock_accounts_db_mutex(orig_id) != 0)
+		return -1;
 	return 0;
 }
 
