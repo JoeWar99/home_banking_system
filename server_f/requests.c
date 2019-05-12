@@ -1,13 +1,13 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include "requests.h"
 #include "../shared/sync.h"
 #include "../shared/constants.h"
 #include "../shared/account_utilities.h"
 #include "../shared/sope.h"
-
-//extern pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS]; 
+#include "../shared/com_protocol.h"
 
 static int is_valid_create_request(const req_value_t * request_value, bank_account_t * accounts_database[]);
 
@@ -86,14 +86,48 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 
 int balance_request(const req_value_t * request_value, bank_account_t * accounts_database[], uint32_t * final_balance, int id){
 	uint32_t orig_id = request_value->header.account_id;
+
 	if(lock_accounts_db_mutex(orig_id) != 0)
 		return -1;
+
 	usleep(request_value->header.op_delay_ms * 1000);
 	logSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms);
+	
 	*final_balance = accounts_database[orig_id]->balance;
+
 	if(unlock_accounts_db_mutex(orig_id) != 0)
 		return -1;
+
 	return 0;
+}
+
+int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_thread) {
+	
+	usleep(request->value.header.op_delay_ms * 1000);
+	logDelay(STDOUT_FILENO, id_thread, request->value.header.op_delay_ms);
+
+	/* No more requests allowed */
+	*balcony_open = 0;
+
+	/* Send message to unlock main function waiting in read */
+	int secure_svr;
+	if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY)) == -1)
+	{
+		perror("open: server is not working 404 error");
+		return RC_SRV_DOWN;
+	}
+	/* Write request */
+	if (write_request(secure_svr, request) != 0)
+	{
+		fprintf(stderr, "write_request: error writing  request to server\n");
+		return RC_OTHER;
+	}
+
+	/* if (fchmod(secure_svr, 0444) != 0)
+	{
+		perror("fchmod: error altering server fifo permissions");*/
+	//  exit(RC_OTHER);
+	return RC_OK;
 }
 
 static int is_valid_create_request(const req_value_t * request_value, bank_account_t * accounts_database[]){

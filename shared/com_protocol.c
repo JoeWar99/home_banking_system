@@ -10,10 +10,8 @@
 void init_request(tlv_request_t * full_request, int operation, int pid, int account_id, char * pwd, int op_delay, char ** req_args) {
 
     uint32_t req_size = 0;
-    // req_size += sizeof(full_request->length);
 
     full_request->type = operation;
-    // req_size += sizeof(full_request->type);
 
     req_value_t * request_value = &(full_request->value);
 
@@ -50,14 +48,11 @@ void init_request(tlv_request_t * full_request, int operation, int pid, int acco
 }
 
 int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int n_threads, uint32_t balance){
-	//TODO verify rep_size is correct
+
 	uint32_t rep_size = 0;
-	// rep_size += sizeof(reply->length);
 
 	/* Init type */
 	reply->type = request->type;
-	// rep_size += sizeof(reply->type);
-
 
 	/* Init value.header */
 	reply->value.header.account_id = request->value.header.account_id;
@@ -105,7 +100,7 @@ int init_secure_fifo_name(char * fifo_name, pid_t pid){
 	return 0;
 }
 
-int write_reply(int fd, tlv_reply_t * request_reply){
+int write_reply(int fd, const tlv_reply_t * request_reply){
 	int total_size = request_reply->length + sizeof(op_type_t) + sizeof(uint32_t);
 	if (write(fd, request_reply, total_size) != total_size)
 		return -1;
@@ -122,7 +117,7 @@ int read_reply(int fd, tlv_reply_t * request_reply){
 	return 0;
 }
 
-int write_request(int fd, tlv_request_t * request){
+int write_request(int fd, const tlv_request_t * request){
 	int total_size = request->length + sizeof(op_type_t) + sizeof(uint32_t);
 	if (write(fd, request, total_size) != total_size)
 		return -1;

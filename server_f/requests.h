@@ -9,3 +9,5 @@ int create_request(const req_value_t * request_value, bank_account_t * accounts_
 int transfer_request(const req_value_t * request_value, bank_account_t * accounts_database[], uint32_t * final_balance, int id);
 
 int balance_request(const req_value_t * request_value, bank_account_t * accounts_database[], uint32_t * final_balance, int id);
+
+int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_thread);

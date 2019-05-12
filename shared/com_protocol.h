@@ -8,10 +8,10 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int n_thre
 
 int init_secure_fifo_name(char * fifo_name, pid_t pid);
 
-int write_reply(int fd, tlv_reply_t * request_reply);
+int write_reply(int fd, const tlv_reply_t * request_reply);
 
 int read_reply(int fd, tlv_reply_t * request_reply);
 
-int write_request(int fd, tlv_request_t * request);
+int write_request(int fd, const tlv_request_t * request);
 
 tlv_request_t * read_request(int fd);

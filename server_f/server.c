@@ -31,8 +31,6 @@ void *balconies(void *arg)
     int id_thread = *(int *)arg;
     int pid_thread = pthread_self();
     int ret, req_ret;
-    // int full_aux;
-    // int empty_aux;
     tlv_request_t *first_request;
 
     logBankOfficeOpen(STDOUT_FILENO, id_thread, pid_thread);
@@ -48,12 +46,12 @@ void *balconies(void *arg)
     {
 		
         /* Wait full */
-		// TODO: change to trywait (??)
 		if((ret = wait_sem_full(id_thread)) != 0){
 			fprintf(stderr, "wait_sem_full: error %d\n", ret);
             exit(RC_OTHER);
 		}
 
+        /* Server shutdown */
 		if(!balcony_open)
 			break;
 
@@ -75,7 +73,6 @@ void *balconies(void *arg)
         if (queue_pop(request_queue) != 0)
         {
             fprintf(stderr, "queue_pop: error removing first queue element\n");
-        //    exit(RC_OTHER);
         }
 
         /* Signal mutex */
@@ -93,57 +90,34 @@ void *balconies(void *arg)
         if (logRequest(STDOUT_FILENO, id_thread, first_request) < 0)
         {
             fprintf(stderr, "logRequest: error writing request to stdout\n");
-        //    exit(RC_OTHER);
         }
 
 		uint32_t balance;
+        int ret;
         if ((req_ret = is_valid_request(first_request, accounts_database)) == 0)
         { 
             switch (first_request->type)
             {
             case OP_CREATE_ACCOUNT:
                 if (create_request(&first_request->value, accounts_database, id_thread) != 0)
-                {
                     fprintf(stderr, "create_request: failed to create account.\n");
-                    //   exit(RC_OTHER);
-                }
                 break;
+
             case OP_TRANSFER:
-                // printf("transfer:  account_id %d, ammount %d\n", request.value.transfer.account_id, request.value.transfer.amount);
                 if(transfer_request(&first_request->value, accounts_database, &balance, id_thread) != 0)
                     fprintf(stderr, "transfer_request: failed to perform transfer request.\n");
                 break;
+
             case OP_BALANCE:
                 if(balance_request(&first_request->value, accounts_database, &balance, id_thread) != 0)
                     fprintf(stderr, "balance_request: failed to perform balance request.\n");
                 break;
+
             case OP_SHUTDOWN:
-                // printf("shutdown\n");
-				
-				// TODO: ver se atraso e mesmo aqui ou em baixo
-				usleep(first_request->value.header.op_delay_ms * 1000);
-				logDelay(STDOUT_FILENO, id_thread, first_request->value.header.op_delay_ms);
-
-				balcony_open = 0;
-				// Enviar mensagem para destravar o main
-				int secure_svr;
-				if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY)) == -1)
-				{
-					perror("open: server is not working 404 error");
-					exit(RC_SRV_DOWN);
-				}
-				/* Write request */
-				if (write_request(secure_svr, first_request) != 0)
-				{
-					fprintf(stderr, "write_request: error writing  request to server\n");
-					exit(RC_OTHER);
-				}
-
-                /* if (fchmod(secure_svr, 0444) != 0)
-                {
-                    perror("fchmod: error altering server fifo permissions");*/
-                //  exit(RC_OTHER);
+                if ((ret = shutdown_request(first_request, &balcony_open, id_thread)) != RC_OK)
+                    exit(ret);
                 break;
+                
 			default:
 				break;
             }
@@ -156,12 +130,9 @@ void *balconies(void *arg)
         if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
         {
             perror("secure_fifo_name");
-            //exit(RC_USR_DOWN);
         }
 
-        tlv_reply_t request_reply;
-		
-		// TODO: tirei daqui os mutex_db ver se esta bem
+        tlv_reply_t request_reply;		
         init_reply(&request_reply, first_request, req_ret, n_threads, balance);
 		
         if (logReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
