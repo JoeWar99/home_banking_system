@@ -2,6 +2,13 @@
 #include <stdio.h>
 #include <string.h>
 
+
+#include <unistd.h>
+#include <sys/types.h>
+
+#define READ	0
+#define WRITE	1
+
 #include "crypto.h"
 #include "constants.h"
 
@@ -27,41 +34,57 @@ int gen_salt(char * buf, int buf_size, int salt_size) {
 }
 
 int gen_hash(const char * pwd, char * salt, char * hash) {
-    FILE * fp;
-    char full_cmd[ MAX_PASSWORD_LEN + SALT_LEN + 20 + 1];
-    full_cmd[0] = '\0';
-    
-    strcat(full_cmd, "echo -n ");
-    strcat(full_cmd, pwd);
-    strcat(full_cmd, salt);
-    strcat(full_cmd, " | sha256sum");
 
-	if ((fp = popen(full_cmd, "r")) == NULL)
-	{
-		fprintf(stderr, "Error opening file pipe!\n");
+	char pass_salt[ MAX_PASSWORD_LEN + SALT_LEN + 1];
+    pass_salt[0] = '\0';
+    
+    strcat(pass_salt, pwd);
+    strcat(pass_salt, salt);
+
+	int fd1[2];
+	int fd2[2];
+
+	pid_t pid;
+
+	if(pipe(fd1) != 0){
+		perror("pipe1");
+		return -1;
+	}
+	if(pipe(fd2) != 0){
+		perror("pipe2");
 		return -1;
 	}
 
-    fgets(hash, HASH_LEN+1, fp);
+	pid = fork();
 
-    if (pclose(fp)) {
-        perror("pclose");
-        return -1;
-    }
-/* TODO handle slow call interruption ??? */
-/*
-    int ret = pclose(fp);
-	if (ret)
-	{
-		if (ret == -1)
-		{
-			perror("pclose");
-			return -1;
-		}
-		else {
-			return PIPE_CMD_ERR;
-		}
+	if(pid == -1){
+		perror("fork");
+		return -3;
 	}
-*/
+	else if(pid > 0){ // pai
+		close(fd1[READ]);
+		close(fd2[WRITE]);
+
+		write(fd1[WRITE], pass_salt, strlen(pass_salt));
+		close(fd1[WRITE]);
+		read(fd2[READ], hash, HASH_LEN + 1);
+		close(fd2[READ]);
+
+		hash[HASH_LEN] = '\0';
+
+	}
+	else{
+		close(fd1[WRITE]);
+		close(fd2[READ]);
+
+		dup2(fd1[READ], STDIN_FILENO);
+		dup2(fd2[WRITE], STDOUT_FILENO);
+		execlp("sha256sum", "sha256sum", NULL);
+	}
+
+
+
+	write(STDERR_FILENO, hash, HASH_LEN);
+
     return 0;   
 }
