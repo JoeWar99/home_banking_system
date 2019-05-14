@@ -2,6 +2,8 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/stat.h>
+
 #include "requests.h"
 #include "../shared/sync.h"
 #include "../shared/constants.h"
@@ -120,7 +122,7 @@ int balance_request(const req_value_t * request_value, bank_account_t * accounts
 	return 0;
 }
 
-int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_thread, int dummy_descriptor) {
+int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_thread, int secure_srv, int dummy_descriptor) {
 	
 	usleep(request->value.header.op_delay_ms * 1000);
 	int ret;
@@ -139,6 +141,15 @@ int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_t
         perror("close: error closing down server fifo");
         return RC_OTHER;
     }
+
+	/* Change server permissions to read only */
+	if (fchmod(secure_srv, 0444) != 0)
+	{
+		perror("fchmod: error altering server fifo permissions");
+		return RC_OTHER;
+	}
+
+	sleep(5);
 
 	return RC_OK;
 }

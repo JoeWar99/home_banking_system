@@ -152,7 +152,7 @@ int main(int argc, char *argv[])
     init_request(&full_request, operation, pid, account_id, pwd, op_delay, req_args);
 
     /* Open server fifo */
-    if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY)) == -1)
+    if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY | O_NONBLOCK)) == -1)
     {
         /* SERVER DOWN */
         init_reply_error(&request_reply, &full_request, RC_SRV_DOWN);
@@ -169,7 +169,7 @@ int main(int argc, char *argv[])
     /* Write request */
     if (write_request(secure_svr, &full_request) != 0)
     {
-        fprintf(stderr, "write_request: error writing  request to server\n");
+        fprintf(stderr, "write_request: error writing request to server\n");
         exit(RC_OTHER);
     }
 
@@ -200,7 +200,6 @@ int main(int argc, char *argv[])
         exit_user_process(RC_USR_DOWN);
     }
     opened_user_fifo = 1;
-
 
     /* Read server reply */
     if (read_reply(user_fifo, &request_reply) != 0)

@@ -26,6 +26,7 @@ bank_account_t *accounts_database[MAX_BANK_ACCOUNTS];
 int n_threads, balcony_open = 1;
 queue_t *request_queue;
 
+int secure_srv;
 int dummy_connection;
 
 void *balconies(void *arg)
@@ -40,8 +41,7 @@ void *balconies(void *arg)
     }
 
     while (1)
-    {
-		
+    {		
         /* Wait full */
 		if((ret = wait_sem_full(id_thread)) != 0){
 			fprintf(stderr, "wait_sem_full: error %d\n", ret);
@@ -112,7 +112,7 @@ void *balconies(void *arg)
                 break;
 
             case OP_SHUTDOWN:
-                if ((ret = shutdown_request(first_request, &balcony_open, id_thread, dummy_connection)) != RC_OK)
+                if ((ret = shutdown_request(first_request, &balcony_open, id_thread, secure_srv, dummy_connection)) != RC_OK)
                     exit(ret);
                 break;
                 
@@ -128,6 +128,8 @@ void *balconies(void *arg)
         if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
         {
             perror("secure_fifo_name");
+            free(first_request);
+            continue;
         }
 
         tlv_reply_t request_reply;		
@@ -136,12 +138,16 @@ void *balconies(void *arg)
         if (syncLogReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
         {
             fprintf(stderr, "logRequest: error writing reply to stdout\n");
+            free(first_request);
+            continue;
         }
 
         /* Send reply to user */
         if (write_reply(user_fifo, &request_reply) != 0)
         {
             fprintf(stderr, "write_reply: error writing reply to server\n");
+            free(first_request);
+            continue;
         }
 
         /* Close user specific fifo */
@@ -238,8 +244,7 @@ int main(int argc, char *argv[])
     }
 
     /* Open server fifo in read mode */
-    int secure_svr;
-    if ((secure_svr = open(SERVER_FIFO_PATH, O_RDONLY)) == -1)
+    if ((secure_srv = open(SERVER_FIFO_PATH, O_RDONLY)) == -1)
     {
         perror("open");
         exit(RC_SRV_DOWN);
@@ -251,19 +256,19 @@ int main(int argc, char *argv[])
         exit(RC_SRV_DOWN);
     }
 
-    while (balcony_open)
+    while (1)
     {
         /* Produce item */
         tlv_request_t * request = (tlv_request_t*)malloc(sizeof(tlv_request_t));;
         int ret_val;
-        if ((ret_val=read_request(secure_svr, request)) < 0)
+        if ((ret_val=read_request(secure_srv, request)) < 0)
         {
 		    free(request);
             fprintf(stderr, "read_request: error reading the request\n");
             break;
         }
 
-		if(!balcony_open)
+		if(!balcony_open && ret_val == 0)
 			break;
        
         if (syncLogRequest(STDOUT_FILENO, MAIN_THREAD_ID, request) < 0)
@@ -332,7 +337,7 @@ int main(int argc, char *argv[])
         free(accounts_database[i]);
 
     /* Close server fifo descriptor */
-    if (close(secure_svr) != 0)
+    if (close(secure_srv) != 0)
     {
         perror("close: error closing down server fifo");
         exit(RC_OTHER);
