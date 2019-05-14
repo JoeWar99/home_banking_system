@@ -6,7 +6,7 @@
 #include "../shared/sync.h"
 #include "../shared/constants.h"
 #include "../shared/account_utilities.h"
-#include "../shared/sope.h"
+#include "../shared/sync_log.h"
 #include "../shared/com_protocol.h"
 
 static int is_valid_create_request(const req_value_t * request_value, bank_account_t * accounts_database[]);
@@ -44,19 +44,10 @@ int create_request(const req_value_t * request_value, bank_account_t * accounts_
 	
 	usleep(request_value->header.op_delay_ms * 1000);
 	
-
-	if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-	logSyncDelay(STDOUT_FILENO, id, create_id, request_value->header.op_delay_ms);
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
-
+	if ((ret = syncLogSyncDelay(STDOUT_FILENO, id, create_id, request_value->header.op_delay_ms)) < 0) {
+		fprintf(stderr, "syncLogSyncDelay error\n");
+		return ret;
+	}
 
 	if(create_account(request_value->create.password, create_id, request_value->create.balance, accounts_database) != 0)
 		ret_code = -1;
@@ -77,18 +68,10 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 	
 	usleep(request_value->header.op_delay_ms * 1000);
 
-	if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-	logSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms);
-
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
+	if ((ret = syncLogSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms)) < 0) {
+		fprintf(stderr, "syncLogSyncDelay error\n");
+		return ret;
+	}
 	
 	accounts_database[orig_id]->balance -= request_value->transfer.amount;
 	*final_balance = accounts_database[orig_id]->balance;
@@ -102,18 +85,10 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 	
 	usleep(request_value->header.op_delay_ms * 1000);
 
-	if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-	logSyncDelay(STDOUT_FILENO, id, dest_id, request_value->header.op_delay_ms);
-
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
+	if ((ret = syncLogSyncDelay(STDOUT_FILENO, id, dest_id, request_value->header.op_delay_ms)) < 0) {
+		fprintf(stderr, "syncLogSyncDelay error\n");
+		return ret;
+	}
 	
 	accounts_database[dest_id]->balance += request_value->transfer.amount;
 	
@@ -132,20 +107,10 @@ int balance_request(const req_value_t * request_value, bank_account_t * accounts
 
 	usleep(request_value->header.op_delay_ms * 1000);
 
-	if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-
-	logSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms);
-
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
-
+	if ((ret = syncLogSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms)) < 0) {
+		fprintf(stderr, "syncLogSyncDelay error\n");
+		return ret;
+	}
 	
 	*final_balance = accounts_database[orig_id]->balance;
 
@@ -160,18 +125,10 @@ int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_t
 	usleep(request->value.header.op_delay_ms * 1000);
 	int ret;
 
-	if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-	logDelay(STDOUT_FILENO, id_thread, request->value.header.op_delay_ms);
-
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
+	if ((ret = syncLogDelay(STDOUT_FILENO, id_thread, request->value.header.op_delay_ms)) < 0) {
+		fprintf(stderr, "syncLogDelay error\n");
+		return ret;
+	}
 
 	/* No more requests allowed */
 	*balcony_open = 0;

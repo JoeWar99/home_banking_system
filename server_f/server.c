@@ -17,7 +17,7 @@
 #include "../shared/sync.h"
 #include "../shared/account_utilities.h"
 #include "../shared/com_protocol.h"
-#include "../shared/sope.h"
+#include "../shared/sync_log.h"
 #include "server_parse.h"
 #include "requests.h"
 
@@ -34,25 +34,11 @@ void *balconies(void *arg)
     int pid_thread = pthread_self();
     int ret, req_ret;
     tlv_request_t *first_request;
+   
+    if (syncLogBankOfficeOpen(STDOUT_FILENO, id_thread, pid_thread) < 0) {
+        fprintf(stderr, "logBankOfficeOpen failed\n");
+    }
 
-    if(lock_log_mutex() != 0){
-        perror("lock_log_mutex: error locking log_mutex");
-        exit(RC_OTHER);   
-    }
-   
-    logBankOfficeOpen(STDOUT_FILENO, id_thread, pid_thread);
-   
-    if(unlock_log_mutex()!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        exit(RC_OTHER);   
-    }
-    /*
-    * Passos:
-    * 	1) Receber pedido
-    *   2) Validar pedido
-    * 	3) Se válido executar pedido
-    * 	4) Responder ao cliente    
-    */
     while (1)
     {
 		
@@ -81,6 +67,7 @@ void *balconies(void *arg)
             exit(RC_OTHER);
         }
 
+        /* Remove from queue */
         if (queue_pop(request_queue) != 0)
         {
             fprintf(stderr, "queue_pop: error removing first queue element\n");
@@ -97,24 +84,11 @@ void *balconies(void *arg)
 			fprintf(stderr, "post_sem_empty: error %d\n", ret);
             exit(RC_OTHER);
 		}
-        
-        if(lock_log_mutex()!= 0){
-            perror("lock_log_mutex: error locking log_mutex");
-            exit(RC_OTHER);   
-        }
    
-        if (logRequest(STDOUT_FILENO, id_thread, first_request) < 0)
+        if (syncLogRequest(STDOUT_FILENO, id_thread, first_request) < 0)
         {
             fprintf(stderr, "logRequest: error writing request to stdout\n");
         }
-
-   
-        if(unlock_log_mutex()!=0){
-            perror("unlock_log_mutex: error unlocking log_mutex");
-            exit(RC_OTHER);   
-        }
-
-
 
 		uint32_t balance;
         int ret;
@@ -158,24 +132,11 @@ void *balconies(void *arg)
 
         tlv_reply_t request_reply;		
         init_reply(&request_reply, first_request, req_ret, n_threads, balance);
-
-        if(lock_log_mutex()!= 0){
-            perror("lock_log_mutex: error locking log_mutex");
-            exit(RC_OTHER);   
-        }
-   
 		
-        if (logReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
+        if (syncLogReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
         {
             fprintf(stderr, "logRequest: error writing reply to stdout\n");
         }
-     
-   
-        if(unlock_log_mutex()!=0){
-            perror("unlock_log_mutex: error unlocking log_mutex");
-            exit(RC_OTHER);   
-        }
-
 
         /* Send reply to user */
         if (write_reply(user_fifo, &request_reply) != 0)
@@ -191,17 +152,9 @@ void *balconies(void *arg)
 
         free(first_request);
     }
-
-    if(lock_log_mutex()!= 0){
-        perror("lock_log_mutex: error locking log_mutex");
-        exit(RC_OTHER);   
-    }  
      
-    logBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread);
-   
-    if(unlock_log_mutex()!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        exit(RC_OTHER);   
+    if (syncLogBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread) < 0)    {
+        fprintf(stderr, "syncLogBankOfficeClose failed\n");
     }
 
 	return NULL;
@@ -312,26 +265,12 @@ int main(int argc, char *argv[])
 
 		if(!balcony_open)
 			break;
-        
-         if(lock_log_mutex()!= 0){
-            perror("lock_log_mutex: error locking log_mutex");
-            exit(RC_OTHER);   
-        }
-   
        
-        if (logRequest(STDOUT_FILENO, MAIN_THREAD_ID, request) < 0)
+        if (syncLogRequest(STDOUT_FILENO, MAIN_THREAD_ID, request) < 0)
         {
-            fprintf(stderr, "logRequest: error writing request to stdout\n");
+            fprintf(stderr, "syncLogRequest: error writing request to stdout\n");
             exit(RC_OTHER);
         }
-
-   
-        if(unlock_log_mutex()!=0){
-            perror("unlock_log_mutex: error unlocking log_mutex");
-            exit(RC_OTHER);   
-        }
-
-
 
         /* Wait empty */
 		if((ret = wait_sem_empty(request->value.header.pid)) != 0){
