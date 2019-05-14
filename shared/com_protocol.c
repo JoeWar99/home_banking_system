@@ -166,24 +166,23 @@ int write_request(int fd, const tlv_request_t * request){
 	return 0;
 }
 
-tlv_request_t * read_request(int fd){
+int read_request(int fd, tlv_request_t * request){
 	op_type_t type;
 	uint32_t req_length;
-	
-	if (read(fd, &type, sizeof(op_type_t)) <= 0)
-		return NULL;
+	int read_val;
 
-	if (read(fd, &req_length, sizeof(uint32_t)) <= 0)
-		return NULL;
+	if ((read_val = read(fd, &type, sizeof(op_type_t))) <= 0) 
+		return read_val;
 
-	tlv_request_t * request = (tlv_request_t*)malloc(sizeof(tlv_request_t));
+	if ((read_val = read(fd, &req_length, sizeof(uint32_t)))  <= 0) 
+		return read_val;
+
 	request->type = type;
 	request->length = req_length;
 
-	if (read(fd, &(request->value), request->length) <= 0) {
-		free(request);
-		return NULL;
+	if ((read_val = read(fd, &(request->value), request->length)) <= 0) {
+		return read_val;
 	}
 
-	return request;
+	return RC_OK;
 }

@@ -26,6 +26,8 @@ bank_account_t *accounts_database[MAX_BANK_ACCOUNTS];
 int n_threads, balcony_open = 1;
 queue_t *request_queue;
 
+int dummy_connection;
+
 void *balconies(void *arg)
 {
     int id_thread = *(int *)arg;
@@ -42,7 +44,7 @@ void *balconies(void *arg)
     * 	3) Se válido executar pedido
     * 	4) Responder ao cliente    
     */
-    while (balcony_open)
+    while (1)
     {
 		
         /* Wait full */
@@ -52,7 +54,7 @@ void *balconies(void *arg)
 		}
 
         /* Server shutdown */
-		if(!balcony_open)
+		if(!balcony_open && is_queue_empty(request_queue))
 			break;
 
         /* Wait mutex */
@@ -114,7 +116,7 @@ void *balconies(void *arg)
                 break;
 
             case OP_SHUTDOWN:
-                if ((ret = shutdown_request(first_request, &balcony_open, id_thread)) != RC_OK)
+                if ((ret = shutdown_request(first_request, &balcony_open, id_thread, dummy_connection)) != RC_OK)
                     exit(ret);
                 break;
                 
@@ -198,7 +200,6 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "init_sync: error: %d\n", ret);
         exit(RC_OTHER);
 	}
-
     
     /* Create server fifo */
     if (mkfifo(SERVER_FIFO_PATH, 0660) < 0)
@@ -237,21 +238,28 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-    /* Open server fifo */
+    /* Open server fifo in read mode */
     int secure_svr;
-    if ((secure_svr = open(SERVER_FIFO_PATH, O_RDWR)) == -1)
+    if ((secure_svr = open(SERVER_FIFO_PATH, O_RDONLY)) == -1)
     {
         perror("open");
         exit(RC_SRV_DOWN);
     }
 
+    /* Open server fifo in write mode */
+    if ((dummy_connection = open(SERVER_FIFO_PATH, O_WRONLY)) == -1) {
+        perror("dummy connection");
+        exit(RC_SRV_DOWN);
+    }
+
     while (balcony_open)
     {
-
         /* Produce item */
-        tlv_request_t * request;
-        if ((request=read_request(secure_svr)) == NULL)
+        tlv_request_t * request = (tlv_request_t*)malloc(sizeof(tlv_request_t));;
+        int ret_val;
+        if ((ret_val=read_request(secure_svr, request)) < 0)
         {
+		    free(request);
             fprintf(stderr, "read_request: error reading the request\n");
             break;
         }
@@ -297,14 +305,12 @@ int main(int argc, char *argv[])
 		}
     }
 
-	if (fchmod(secure_svr, 0444) != 0){
-		perror("fchmod: error altering server fifo permissions");
-		exit(RC_OTHER);
-	}	
-
+    /* Wait for threads to finish */
 	for(int i = 0; i < n_threads; i++){
 		post_sem_full(MAIN_THREAD_ID);
-		printf("Get %d\n", i);
+	}
+
+    for(int i = 0; i < n_threads; i++){
         if(pthread_join(thread_tid[i], NULL) != 0)
 			fprintf(stderr, "Error joininig thread %d\n", i);
 	}
@@ -316,6 +322,7 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
+    /* Delete sync mechanisms */
 	if(del_sync() != 0){
 		fprintf(stderr, "del_sync: error %d\n", ret);
         exit(RC_OTHER);
