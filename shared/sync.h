@@ -4,6 +4,10 @@
 #include <sys/types.h>
 #include <stdint.h>
 
+int lock_log_mutex();
+
+int unlock_log_mutex();
+
 int init_sync(uint32_t n_threads);
 
 int del_sync();

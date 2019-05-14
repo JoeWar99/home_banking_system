@@ -36,13 +36,27 @@ int is_valid_request(tlv_request_t * request, bank_account_t * accounts_database
 int create_request(const req_value_t * request_value, bank_account_t * accounts_database[], int id){
 	int ret_code = 0;
 	uint32_t create_id = request_value->create.account_id;
+	int ret;
 
 	// TODO: passar para dentro do create account para server tbm usar isto?? n sei se gosto
 	if(lock_accounts_db_mutex(create_id) != 0)
 		return -2;
 	
 	usleep(request_value->header.op_delay_ms * 1000);
+	
+
+	if((ret = lock_log_mutex())!=0){
+        perror("lock_log_mutex: error locking log_mutex");
+        return ret;  
+    }
+
 	logSyncDelay(STDOUT_FILENO, id, create_id, request_value->header.op_delay_ms);
+
+    if((ret = unlock_log_mutex())!=0){
+        perror("unlock_log_mutex: error unlocking log_mutex");
+        return ret;   
+    }
+
 
 	if(create_account(request_value->create.password, create_id, request_value->create.balance, accounts_database) != 0)
 		ret_code = -1;
@@ -56,12 +70,25 @@ int create_request(const req_value_t * request_value, bank_account_t * accounts_
 int transfer_request(const req_value_t * request_value, bank_account_t * accounts_database[], uint32_t * final_balance, int id){
 	uint32_t orig_id = request_value->header.account_id;
 	uint32_t dest_id = request_value->transfer.account_id;
+	int ret;
 
 	if(lock_accounts_db_mutex(orig_id) != 0)
 		return -1;
 	
 	usleep(request_value->header.op_delay_ms * 1000);
+
+	if((ret = lock_log_mutex())!=0){
+        perror("lock_log_mutex: error locking log_mutex");
+        return ret;  
+    }
+
 	logSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms);
+
+
+    if((ret = unlock_log_mutex())!=0){
+        perror("unlock_log_mutex: error unlocking log_mutex");
+        return ret;   
+    }
 	
 	accounts_database[orig_id]->balance -= request_value->transfer.amount;
 	*final_balance = accounts_database[orig_id]->balance;
@@ -74,7 +101,19 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 		return -2;
 	
 	usleep(request_value->header.op_delay_ms * 1000);
+
+	if((ret = lock_log_mutex())!=0){
+        perror("lock_log_mutex: error locking log_mutex");
+        return ret;  
+    }
+
 	logSyncDelay(STDOUT_FILENO, id, dest_id, request_value->header.op_delay_ms);
+
+
+    if((ret = unlock_log_mutex())!=0){
+        perror("unlock_log_mutex: error unlocking log_mutex");
+        return ret;   
+    }
 	
 	accounts_database[dest_id]->balance += request_value->transfer.amount;
 	
@@ -86,12 +125,27 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 
 int balance_request(const req_value_t * request_value, bank_account_t * accounts_database[], uint32_t * final_balance, int id){
 	uint32_t orig_id = request_value->header.account_id;
+	int ret;
 
 	if(lock_accounts_db_mutex(orig_id) != 0)
 		return -1;
 
 	usleep(request_value->header.op_delay_ms * 1000);
+
+	if((ret = lock_log_mutex())!=0){
+        perror("lock_log_mutex: error locking log_mutex");
+        return ret;  
+    }
+
+
 	logSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms);
+
+
+    if((ret = unlock_log_mutex())!=0){
+        perror("unlock_log_mutex: error unlocking log_mutex");
+        return ret;   
+    }
+
 	
 	*final_balance = accounts_database[orig_id]->balance;
 
@@ -104,7 +158,20 @@ int balance_request(const req_value_t * request_value, bank_account_t * accounts
 int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_thread) {
 	
 	usleep(request->value.header.op_delay_ms * 1000);
+	int ret;
+
+	if((ret = lock_log_mutex())!=0){
+        perror("lock_log_mutex: error locking log_mutex");
+        return ret;  
+    }
+
 	logDelay(STDOUT_FILENO, id_thread, request->value.header.op_delay_ms);
+
+
+    if((ret = unlock_log_mutex())!=0){
+        perror("unlock_log_mutex: error unlocking log_mutex");
+        return ret;   
+    }
 
 	/* No more requests allowed */
 	*balcony_open = 0;
