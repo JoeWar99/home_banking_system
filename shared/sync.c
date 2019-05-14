@@ -11,7 +11,6 @@ static pthread_mutex_t req_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
-
 int lock_log_mutex(){
 	return pthread_mutex_lock(&log_mutex);
 }
@@ -28,7 +27,7 @@ int unlock_log_mutex(){
 int init_sync(uint32_t n_threads){
 	int ret;
 
-	 if((ret = lock_log_mutex())!=0){
+    if((ret = lock_log_mutex())!=0){
         perror("lock_log_mutex: error locking log_mutex");
         return ret;  
     }
@@ -45,7 +44,7 @@ int init_sync(uint32_t n_threads){
 		return -1;
 
 	
-	 if((ret = lock_log_mutex())!=0){
+	if((ret = lock_log_mutex())!=0){
         perror("lock_log_mutex: error locking log_mutex");
         return ret;  
     }
@@ -109,7 +108,8 @@ int wait_sem_empty(pid_t sid){
 		perror("sem_get_value:");
 		return ret;		
 	}
-	 if((ret = lock_log_mutex())!=0){
+	
+	if((ret = lock_log_mutex())!=0){
         perror("lock_log_mutex: error locking log_mutex");
         return ret;  
     }

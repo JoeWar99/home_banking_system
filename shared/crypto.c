@@ -61,30 +61,57 @@ int gen_hash(const char * pwd, char * salt, char * hash) {
 		perror("fork");
 		return -3;
 	}
-	else if(pid > 0){ // pai
-		close(fd1[READ]);
-		close(fd2[WRITE]);
+	else if(pid > 0){ // parent
+		/* Close unnecessary descriptors */
+		if (close(fd1[READ]) == -1) {
+			perror("close fd1 read");
+			return -1;
+		}
+		if (close(fd2[WRITE]) == -1) {
+			perror("close fd2 write");
+			return -1;
+		}
 
-		write(fd1[WRITE], pass_salt, strlen(pass_salt));
-		close(fd1[WRITE]);
-		read(fd2[READ], hash, HASH_LEN + 1);
-		close(fd2[READ]);
+		/* Write input for sha256sum */
+		if (write(fd1[WRITE], pass_salt, strlen(pass_salt)) == -1) {
+			perror("parent write");
+			return -1;
+		}
+
+		if (close(fd1[WRITE]) == -1) {
+			perror("close fd1 write");
+			return -1;
+		}
+
+		/* Read output from sha256sum */
+		if (read(fd2[READ], hash, HASH_LEN + 1) == -1) {
+			perror("parent read");
+			return -1;
+		}
+		
+		if (close(fd2[READ]) == -1) {
+			perror("close fd2 read");
+			return -1;
+		}
 
 		hash[HASH_LEN] = '\0';
 
 	}
 	else{
-		close(fd1[WRITE]);
-		close(fd2[READ]);
+		/* Close unnecessary descriptors */
+		if (close(fd1[WRITE]) == -1) {
+			perror("close fd1 write");
+			return -1;
+		}
+		if (close(fd2[READ]) == -1) {
+			perror("close fd2 read");
+			return -1;
+		}
 
 		dup2(fd1[READ], STDIN_FILENO);
 		dup2(fd2[WRITE], STDOUT_FILENO);
 		execlp("sha256sum", "sha256sum", NULL);
 	}
-
-
-
-	write(STDERR_FILENO, hash, HASH_LEN);
 
     return 0;   
 }

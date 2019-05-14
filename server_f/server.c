@@ -35,7 +35,7 @@ void *balconies(void *arg)
     int ret, req_ret;
     tlv_request_t *first_request;
 
-    if(lock_log_mutex()!= 0){
+    if(lock_log_mutex() != 0){
         perror("lock_log_mutex: error locking log_mutex");
         exit(RC_OTHER);   
     }
@@ -159,7 +159,7 @@ void *balconies(void *arg)
         tlv_reply_t request_reply;		
         init_reply(&request_reply, first_request, req_ret, n_threads, balance);
 
-         if(lock_log_mutex()!= 0){
+        if(lock_log_mutex()!= 0){
             perror("lock_log_mutex: error locking log_mutex");
             exit(RC_OTHER);   
         }
@@ -192,20 +192,17 @@ void *balconies(void *arg)
         free(first_request);
     }
 
-     if(lock_log_mutex()!= 0){
-            perror("lock_log_mutex: error locking log_mutex");
-            exit(RC_OTHER);   
-    }
-   
+    if(lock_log_mutex()!= 0){
+        perror("lock_log_mutex: error locking log_mutex");
+        exit(RC_OTHER);   
+    }  
      
     logBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread);
-
    
     if(unlock_log_mutex()!=0){
-            perror("unlock_log_mutex: error unlocking log_mutex");
-            exit(RC_OTHER);   
+        perror("unlock_log_mutex: error unlocking log_mutex");
+        exit(RC_OTHER);   
     }
-
 
 	return NULL;
 }
