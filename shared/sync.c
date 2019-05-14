@@ -27,7 +27,19 @@ int unlock_log_mutex(){
 
 int init_sync(uint32_t n_threads){
 	int ret;
+
+	 if((ret = lock_log_mutex())!=0){
+        perror("lock_log_mutex: error locking log_mutex");
+        return ret;  
+    }
+
     logSyncMechSem(STDOUT_FILENO, MAIN_THREAD_ID, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, MAIN_THREAD_ID, 0);
+
+    if((ret = unlock_log_mutex())!=0){
+        perror("unlock_log_mutex: error unlocking log_mutex");
+        return ret;   
+    }
+
     /* Initialize FULL semaphore with 0 */
     if (sem_init(&full, SHARED_SEM, 0) != 0)
 		return -1;
@@ -38,9 +50,7 @@ int init_sync(uint32_t n_threads){
         return ret;  
     }
 
-
     logSyncMechSem(STDOUT_FILENO, MAIN_THREAD_ID, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, MAIN_THREAD_ID, n_threads);
-
 
     if((ret = unlock_log_mutex())!=0){
         perror("unlock_log_mutex: error unlocking log_mutex");
@@ -174,7 +184,7 @@ int wait_sem_full(int balcony_id){
         perror("unlock_log_mutex: error unlocking log_mutex");
         return ret;   
     }
-	
+
 	return sem_wait(&full);
 }
 
