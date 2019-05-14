@@ -16,4 +16,4 @@ int read_reply(int fd, tlv_reply_t * request_reply);
 
 int write_request(int fd, const tlv_request_t * request);
 
-tlv_request_t * read_request(int fd);
+int read_request(int fd, tlv_request_t * request);

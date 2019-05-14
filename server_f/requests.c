@@ -155,7 +155,7 @@ int balance_request(const req_value_t * request_value, bank_account_t * accounts
 	return 0;
 }
 
-int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_thread) {
+int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_thread, int dummy_descriptor) {
 	
 	usleep(request->value.header.op_delay_ms * 1000);
 	int ret;
@@ -176,24 +176,13 @@ int shutdown_request(const tlv_request_t * request, int * balcony_open, int id_t
 	/* No more requests allowed */
 	*balcony_open = 0;
 
-	/* Send message to unlock main function waiting in read */
-	int secure_svr;
-	if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY)) == -1)
-	{
-		perror("open: server is not working 404 error");
-		return RC_SRV_DOWN;
-	}
-	/* Write request */
-	if (write_request(secure_svr, request) != 0)
-	{
-		fprintf(stderr, "write_request: error writing  request to server\n");
-		return RC_OTHER;
-	}
+	/* Close dummy connection in write mode, to close reading FIFO */
+	if (close(dummy_descriptor) != 0)
+    {
+        perror("close: error closing down server fifo");
+        return RC_OTHER;
+    }
 
-	/* if (fchmod(secure_svr, 0444) != 0)
-	{
-		perror("fchmod: error altering server fifo permissions");*/
-	//  exit(RC_OTHER);
 	return RC_OK;
 }
 
