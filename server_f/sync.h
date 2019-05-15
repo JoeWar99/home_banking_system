@@ -31,3 +31,5 @@ int unlock_queue_mutex(int balcony_id, sync_role_t role, pid_t sid);
 int lock_accounts_db_mutex(uint32_t muttex_id);
 
 int unlock_accounts_db_mutex(uint32_t muttex_id);
+
+int try_lock_accounts_db_mutex(uint32_t muttex_id);

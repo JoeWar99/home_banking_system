@@ -1,6 +1,7 @@
 #include "sync.h"
 
 #include <pthread.h>
+#include <errno.h>
 #include <semaphore.h>
 #include "../shared/sope.h"
 #include "../shared/constants.h"
@@ -272,4 +273,15 @@ int unlock_accounts_db_mutex(uint32_t muttex_id) {
 	// TODO: ver log message que n estava
 	//logSyncMech(STDOUT_FILENO, balcony_id, SYNC_OP_MUTEX_UNLOCK, role, sid);
 	return 0;
+}
+
+int try_lock_accounts_db_mutex(uint32_t muttex_id) {
+	int ret;
+	// TODO: ver log message que n estava
+	//logSyncMech(STDOUT_FILENO, balcony_id, SYNC_OP_MUTEX_TRYLOCK, role, sid);
+
+    if((ret = pthread_mutex_trylock(&accounts_db_mutex[muttex_id])) != 0) 
+        if(errno == EAGAIN)
+            return 1;
+    return ret;
 }

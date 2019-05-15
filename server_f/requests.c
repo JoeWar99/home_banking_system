@@ -56,13 +56,13 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 	if(lock_accounts_db_mutex(first) != 0)
 		return RC_OTHER;
 	
-	usleep(request_value->header.op_delay_ms * 1000);
-
-	if (syncLogSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms) < 0)
-		fprintf(stderr, "syncLogSyncDelay error\n");
-	
 	/* If the IDs are the same */
 	if(first == second){
+		usleep(request_value->header.op_delay_ms * 1000);
+
+		if (syncLogSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms) < 0)
+			fprintf(stderr, "syncLogSyncDelay error\n");
+
 		/* Verify password - if it is wrong it must not give access to the balance */
 		if(authenticate(request_value->header.password, accounts_database[orig_id]) != 0){
 			if(unlock_accounts_db_mutex(first) != 0)
@@ -83,9 +83,20 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 		return ret_code;
 	}
 	
-	if(lock_accounts_db_mutex(second) != 0){
+	if((ret_code = try_lock_accounts_db_mutex(second)) < 0){
 		unlock_accounts_db_mutex(first);
 		return RC_OTHER;
+	}
+	else if(ret_code == 1){
+		usleep(request_value->header.op_delay_ms * 1000);
+		// TODO: ver info do log
+		if (syncLogSyncDelay(STDOUT_FILENO, id, orig_id, request_value->header.op_delay_ms) < 0)
+			fprintf(stderr, "syncLogSyncDelay error\n");
+			
+		if(lock_accounts_db_mutex(second) != 0){
+			unlock_accounts_db_mutex(first);
+			return RC_OTHER;
+		}
 	}
 
 	usleep(request_value->header.op_delay_ms * 1000);
