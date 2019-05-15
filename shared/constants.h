@@ -29,6 +29,7 @@
 
 #define SERVER_FIFO_PATH "/tmp/secure_srv"
 #define USER_FIFO_PATH_PREFIX "/tmp/secure_"
+#define ULOG_SEM_NAME  "/sem_ulog"
 #define USER_FIFO_PATH_LEN (sizeof(USER_FIFO_PATH_PREFIX) + WIDTH_ID + 1)
 
 

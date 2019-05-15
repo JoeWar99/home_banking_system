@@ -8,6 +8,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <signal.h>
+#include <semaphore.h>
 #include "../shared/utilities.h"
 #include "../shared/constants.h"
 #include "../shared/types.h"
@@ -25,6 +26,7 @@ int logged_reply = 0;
 
 tlv_request_t full_request;
 tlv_reply_t request_reply;
+sem_t * ulog_sem;
 
 void exit_user_process(ret_code_t ret)
 {
@@ -34,20 +36,36 @@ void exit_user_process(ret_code_t ret)
 
     if (!logged_request) 
     {
+		if(sem_wait(ulog_sem) != 0){
+			perror("ulog_sem failure sem_wait");
+			exit(RC_OTHER);
+		}
         if (logRequest(STDOUT_FILENO, pid, &full_request) < 0)
         {
             fprintf(stderr, "logRequest: error writing request to stdout\n");
             exit(RC_OTHER);
         }
+		if(sem_post(ulog_sem) != 0){
+			perror("ulog_sem failure sem_post");
+			exit(RC_OTHER);
+		}
     }
 
     if (!logged_reply) 
     {
+		if(sem_wait(ulog_sem) != 0){
+			perror("ulog_sem failure sem_wait");
+			exit(RC_OTHER);
+		}
         if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
         {
             fprintf(stderr, "logRequest: error writing reply to stdout\n");
             exit(RC_OTHER);
         }
+		if(sem_post(ulog_sem) != 0){
+			perror("ulog_sem failure sem_post");
+			exit(RC_OTHER);
+		}
     }
    
     if (opened_srv_fifo)
@@ -73,6 +91,11 @@ void exit_user_process(ret_code_t ret)
         perror("unlink: error unlinking user fifo");
         exit(RC_OTHER);
     }
+
+	if(sem_close(ulog_sem)){
+		perror("ulog_sem failure sem_close");
+		exit(RC_OTHER);
+	}
 
     exit(ret);
 }
@@ -136,6 +159,10 @@ int main(int argc, char *argv[])
     }
     dup2(logfile, STDOUT_FILENO);
 
+	if((ulog_sem = sem_open(ULOG_SEM_NAME, 0, 0600, 0)) == SEM_FAILED){
+		perror("ulog_sem failure in sem_open()");     
+		exit(RC_OTHER); 
+	}
 
     /* Create user specific fifo */
     char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
@@ -179,11 +206,19 @@ int main(int argc, char *argv[])
     /* Set alarm */
     alarm(FIFO_TIMEOUT_SECS);
 
+	if(sem_wait(ulog_sem) != 0){
+		perror("ulog_sem failure sem_wait");
+		exit(RC_OTHER);
+	}
     if (logRequest(STDOUT_FILENO, pid, &full_request) < 0)
     {
         fprintf(stderr, "logRequest: error writing request to stdout\n");
         exit(RC_OTHER);
     }
+	if(sem_post(ulog_sem) != 0){
+		perror("ulog_sem failure sem_post");
+		exit(RC_OTHER);
+	}
     logged_request = 1;
 
     /* Open user specific fifo */
@@ -210,11 +245,19 @@ int main(int argc, char *argv[])
     
     alarm(0);
 
+	if(sem_wait(ulog_sem) != 0){
+		perror("ulog_sem failure sem_wait");
+		exit(RC_OTHER);
+	}
     if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
     {
         fprintf(stderr, "logRequest: error writing reply to stdout\n");
         exit(RC_OTHER);
     }
+	if(sem_post(ulog_sem) != 0){
+		perror("ulog_sem failure sem_post");
+		exit(RC_OTHER);
+	}
     logged_reply = 1;
 
     /* Free alocated memory */

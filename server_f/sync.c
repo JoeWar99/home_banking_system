@@ -2,10 +2,12 @@
 
 #include <pthread.h>
 #include <semaphore.h>
+#include <fcntl.h>
 #include "../shared/sope.h"
 #include "../shared/constants.h"
 
 static sem_t full, empty;
+static sem_t * ulog_sem;
 static pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS];
 static pthread_mutex_t req_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -66,7 +68,12 @@ int init_sync(uint32_t n_threads){
 	 for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS; i++)
         if(pthread_mutex_init(&accounts_db_mutex[i], NULL) != 0)
 			return -2;
-	
+
+	if((ulog_sem = sem_open(ULOG_SEM_NAME, O_CREAT, 0600, 1)) == SEM_FAILED) {
+		perror("ulog_sem failure in sem_open()");
+		return -3;
+	} 
+
 	return 0;
 }
 
@@ -88,6 +95,12 @@ int del_sync(){
     /* Destroy request queue mutex */
 	if(pthread_mutex_destroy(&req_queue_mutex) != 0)
 		return -2;
+
+	if(sem_close(ulog_sem) != 0)
+		return -3;
+	
+	if(sem_unlink(ULOG_SEM_NAME) != 0)
+		return -3;
 
 	return 0;
 }
