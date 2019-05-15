@@ -91,35 +91,29 @@ void *balconies(void *arg)
         }
 
 		uint32_t balance;
-        int ret;
-        if ((req_ret = is_valid_request(first_request, accounts_database)) == 0)
-        { 
-            switch (first_request->type)
-            {
-            case OP_CREATE_ACCOUNT:
-                if (create_request(&first_request->value, accounts_database, id_thread) != 0)
-                    fprintf(stderr, "create_request: failed to create account.\n");
-                break;
+        
+		switch (first_request->type)
+		{
+		case OP_CREATE_ACCOUNT:
+			req_ret = create_request(&first_request->value, accounts_database, id_thread);
+			break;
 
-            case OP_TRANSFER:
-                if(transfer_request(&first_request->value, accounts_database, &balance, id_thread) != 0)
-                    fprintf(stderr, "transfer_request: failed to perform transfer request.\n");
-                break;
+		case OP_TRANSFER:
+			req_ret = transfer_request(&first_request->value, accounts_database, id_thread, &balance);
+			break;
 
-            case OP_BALANCE:
-                if(balance_request(&first_request->value, accounts_database, &balance, id_thread) != 0)
-                    fprintf(stderr, "balance_request: failed to perform balance request.\n");
-                break;
+		case OP_BALANCE:
+			req_ret = balance_request(&first_request->value, accounts_database, id_thread, &balance);
+			break;
 
-            case OP_SHUTDOWN:
-                if ((ret = shutdown_request(first_request, &balcony_open, id_thread, secure_srv, dummy_connection)) != RC_OK)
-                    exit(ret);
-                break;
-                
-			default:
-				break;
-            }
-        }
+		case OP_SHUTDOWN:
+			req_ret = shutdown_request(&first_request->value, accounts_database, id_thread, &balcony_open, secure_srv, dummy_connection);
+			break;
+			
+		default:
+			break;
+		}
+        
 
         char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
         init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);

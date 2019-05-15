@@ -31,10 +31,10 @@ int authenticate(const char * pwd, bank_account_t * bank_account){
 
 int create_account(const char * pwd, uint32_t account_id, uint32_t balance, bank_account_t * accounts_database[]){
 	if(gen_salt(accounts_database[account_id]->salt, SALT_LEN + 1, SALT_LEN) != 0)
-		return -1;
+		return RC_OTHER;
     if(gen_hash(pwd, accounts_database[account_id]->salt, accounts_database[account_id]->hash) != 0)
-		return -2;
+		return RC_OTHER;
 	accounts_database[account_id]->account_id = account_id;
 	accounts_database[account_id]->balance = balance;
-	return 0;
+	return RC_OK;
 }
