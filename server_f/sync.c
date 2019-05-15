@@ -2,8 +2,8 @@
 
 #include <pthread.h>
 #include <semaphore.h>
-#include "sope.h"
-#include "constants.h"
+#include "../shared/sope.h"
+#include "../shared/constants.h"
 
 static sem_t full, empty;
 static pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS];

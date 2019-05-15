@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../shared/types.h"
+#include "types.h"
 
 void init_request(tlv_request_t * full_request, int operation, int pid, int account_id, char * pwd, int op_delay, char ** req_args);
 

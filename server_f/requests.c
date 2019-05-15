@@ -5,12 +5,14 @@
 #include <sys/stat.h>
 
 #include "requests.h"
-#include "../shared/sync.h"
+#include "sync.h"
+#include "sync_log.h"
 #include "../shared/constants.h"
 #include "../shared/utilities.h"
 #include "../shared/account_utilities.h"
-#include "../shared/sync_log.h"
 #include "../shared/com_protocol.h"
+
+// TODO: ver se os lock_accounts_db_mutex n precisam de log tbm
 
 static int is_valid_create_request(const req_value_t * request_value, bank_account_t * accounts_database[]);
 

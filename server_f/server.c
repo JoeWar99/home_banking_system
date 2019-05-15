@@ -14,10 +14,10 @@
 #include "../shared/types.h"
 #include "../shared/crypto.h"
 #include "../shared/queue.h"
-#include "../shared/sync.h"
+#include "sync.h"
 #include "../shared/account_utilities.h"
 #include "../shared/com_protocol.h"
-#include "../shared/sync_log.h"
+#include "sync_log.h"
 #include "server_parse.h"
 #include "requests.h"
 

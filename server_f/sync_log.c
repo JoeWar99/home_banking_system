@@ -1,5 +1,5 @@
 #include "sync_log.h"
-#include "sope.h"
+#include "../shared/sope.h"
 #include "sync.h"
 
 int syncLogRequest(int fd, int id, const tlv_request_t *request) {

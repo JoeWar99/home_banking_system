@@ -1,7 +1,7 @@
 #pragma once
 
 #include <pthread.h>
-#include "types.h"
+#include "../shared/types.h"
 
 int syncLogRequest(int fd, int id, const tlv_request_t *request);
 
