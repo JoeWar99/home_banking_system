@@ -196,21 +196,29 @@ int unlock_queue_mutex(int balcony_id, sync_role_t role, pid_t sid){
 	return 0;
 }
 
-int lock_accounts_db_mutex(uint32_t muttex_id){
-	// TODO: ver log message que n estava
-	// logSyncMech(STDOUT_FILENO, balcony_id, SYNC_OP_MUTEX_LOCK, role, sid);
-    return pthread_mutex_lock(&accounts_db_mutex[muttex_id]);
-}
-
-int unlock_accounts_db_mutex(uint32_t muttex_id) {
+int lock_accounts_db_mutex(int id, sync_role_t role, pid_t sid){
 	int ret;
 
-	if((ret = pthread_mutex_unlock(&accounts_db_mutex[muttex_id])) != 0){
+	if ((ret = syncLogSyncMech(STDOUT_FILENO, id, SYNC_OP_MUTEX_LOCK, role, sid)) < 0) {
+		perror("syncLogSyncMech:");
+		return ret;
+	}
+
+    return pthread_mutex_lock(&accounts_db_mutex[sid]);
+}
+
+int unlock_accounts_db_mutex(int id, sync_role_t role, pid_t sid) {
+	int ret;
+
+	if((ret = pthread_mutex_unlock(&accounts_db_mutex[sid])) != 0){
 		perror("pthread_mutex_unlock:");
 		return ret;
 	}
 
-	// TODO: ver log message que n estava
-	//logSyncMech(STDOUT_FILENO, balcony_id, SYNC_OP_MUTEX_UNLOCK, role, sid);
+	if((ret = syncLogSyncMech(STDOUT_FILENO, id, SYNC_OP_MUTEX_UNLOCK, role, sid)) < 0){
+		perror("syncLogSyncMech:");
+		return ret;
+	}
+
 	return 0;
 }

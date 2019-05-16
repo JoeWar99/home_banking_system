@@ -12,8 +12,6 @@
 #include "../shared/account_utilities.h"
 #include "../shared/com_protocol.h"
 
-// TODO: ver se os lock_accounts_db_mutex n precisam de log tbm
-
 static int is_valid_create_request(const req_value_t * request_value, bank_account_t * accounts_database[]);
 
 static int is_valid_transfer_request(const req_value_t * request_value, bank_account_t * accounts_database[]);
@@ -26,7 +24,7 @@ int create_request(const req_value_t * request_value, bank_account_t * accounts_
 	int ret_code = RC_OK;
 	uint32_t create_id = request_value->create.account_id;
 
-	if(lock_accounts_db_mutex(create_id) != 0)
+	if(lock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, create_id) != 0)
 		return RC_OTHER;
 	
 	usleep(request_value->header.op_delay_ms * 1000);
@@ -34,25 +32,24 @@ int create_request(const req_value_t * request_value, bank_account_t * accounts_
 	if (syncLogSyncDelay(STDOUT_FILENO, id, create_id, request_value->header.op_delay_ms) < 0)
 		fprintf(stderr, "syncLogSyncDelay error\n");
 
-
 	if((ret_code = is_valid_create_request(request_value, accounts_database)) == RC_OK)
 		if((ret_code = create_account(request_value->create.password, create_id, request_value->create.balance, accounts_database)) != RC_OK)
 			fprintf(stderr, "create_account: error creating the account\n");
 
-	if(unlock_accounts_db_mutex(create_id) != 0)
+	if(unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, create_id) != 0)
 		return RC_OTHER;
 
 	return ret_code;
 }
 
-int transfer_request(const req_value_t * request_value, bank_account_t * accounts_database[],int id,  uint32_t * final_balance){
+int transfer_request(const req_value_t * request_value, bank_account_t * accounts_database[], int id, uint32_t * final_balance){
 	uint32_t orig_id = request_value->header.account_id;
 	uint32_t dest_id = request_value->transfer.account_id;
 	int first = min(orig_id, dest_id);
 	int second = max(orig_id, dest_id);
 	int ret_code = RC_OK;
 
-	if(lock_accounts_db_mutex(first) != 0)
+	if(lock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, first) != 0)
 		return RC_OTHER;
 	
 	usleep(request_value->header.op_delay_ms * 1000);
@@ -64,7 +61,7 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 	if(first == second){
 		/* Verify password - if it is wrong it must not give access to the balance */
 		if(authenticate(request_value->header.password, accounts_database[orig_id]) != 0){
-			if(unlock_accounts_db_mutex(first) != 0)
+			if(unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, first) != 0)
 				return RC_OTHER;
 			
 			return RC_LOGIN_FAIL;
@@ -76,14 +73,14 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 		/* Will return in the SAME_ID in the worst case */
 		ret_code = is_valid_transfer_request(request_value, accounts_database);
 
-		if(unlock_accounts_db_mutex(first) != 0)
+		if(unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, first) != 0)
 			return RC_OTHER;
 		
 		return ret_code;
 	}
 	
-	if(lock_accounts_db_mutex(second) != 0){
-		unlock_accounts_db_mutex(first);
+	if(lock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, second) != 0){
+		unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, first);
 		return RC_OTHER;
 	}
 
@@ -95,12 +92,12 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 	/* Verify password - if it is wrong it must not give access to the balance */
 	if(authenticate(request_value->header.password, accounts_database[orig_id]) != 0){
 	
-		if(unlock_accounts_db_mutex(second) != 0){
-			unlock_accounts_db_mutex(first);
+		if(unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, second) != 0){
+			unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, first);
 			return RC_OTHER;
 		}
 
-		if(unlock_accounts_db_mutex(first) != 0)
+		if(unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, first) != 0)
 			return RC_OTHER;
 		
 		return RC_LOGIN_FAIL;
@@ -114,12 +111,12 @@ int transfer_request(const req_value_t * request_value, bank_account_t * account
 	/* Even though there was an error, return balance before operation */
 	*final_balance = accounts_database[orig_id]->balance;
 
-	if(unlock_accounts_db_mutex(second) != 0){
-		unlock_accounts_db_mutex(first);
+	if(unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, second) != 0){
+		unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, first);
 		return RC_OTHER;
 	}
 
-	if(unlock_accounts_db_mutex(first) != 0)
+	if(unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, first) != 0)
 		return RC_OTHER;
 
 	return ret_code;
@@ -129,7 +126,7 @@ int balance_request(const req_value_t * request_value, bank_account_t * accounts
 	uint32_t orig_id = request_value->header.account_id;
 	int ret_code;
 
-	if(lock_accounts_db_mutex(orig_id) != 0)
+	if(lock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, orig_id) != 0)
 		return RC_OTHER;
 
 	usleep(request_value->header.op_delay_ms * 1000);
@@ -140,7 +137,7 @@ int balance_request(const req_value_t * request_value, bank_account_t * accounts
 	if((ret_code = is_valid_balance_request(request_value, accounts_database)) == RC_OK)	
 		*final_balance = accounts_database[orig_id]->balance;
 
-	if(unlock_accounts_db_mutex(orig_id) != 0)
+	if(unlock_accounts_db_mutex(id, SYNC_ROLE_ACCOUNT, orig_id) != 0)
 		return RC_OTHER;
 
 	return ret_code;

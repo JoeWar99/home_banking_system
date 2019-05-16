@@ -149,7 +149,7 @@ int main(int argc, char *argv[])
 		}
 
         /* Wait mutex */
-		if((ret = lock_queue_mutex(MAIN_THREAD_ID, SYNC_ROLE_ACCOUNT, request->value.header.pid)) != 0)
+		if((ret = lock_queue_mutex(MAIN_THREAD_ID, SYNC_ROLE_PRODUCER, request->value.header.pid)) != 0)
         {
 			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
             exit(RC_OTHER);
@@ -163,7 +163,7 @@ int main(int argc, char *argv[])
         }
 
         /* Signal mutex */
-		if((ret = unlock_queue_mutex(MAIN_THREAD_ID, SYNC_ROLE_ACCOUNT, request->value.header.pid)) != 0){
+		if((ret = unlock_queue_mutex(MAIN_THREAD_ID, SYNC_ROLE_PRODUCER, request->value.header.pid)) != 0){
 			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
             exit(RC_OTHER);
 		}
