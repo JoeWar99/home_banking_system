@@ -12,7 +12,10 @@ DEPS = $(patsubst %.c,%.d,$(wildcard *.c))
 
 .PHONY: all clean
 
-all: $(EXEC1) $(EXEC2)
+all: $(EXEC1) $(EXEC2) log
+
+log:
+	touch ulog.txt slog.txt
 
 %.o: %.c
 	$(CC) $(CFLAGS) -MMD -c $< -o $@
@@ -24,7 +27,7 @@ $(EXEC2): $(OBJ_USER)
 	$(CC) $(CFLAGS) -o $@ $(OBJ_USER) $(LBLIBS)
 
 clean:
-	rm -rf $(EXEC1) $(EXEC2) *.o *.d *_f/*.o *_f/*.d shared/*.o shared/*.d
+	rm -rf $(EXEC1) $(EXEC2) *.o *.d *_f/*.o *_f/*.d shared/*.o shared/*.d *log.txt
 
 clean_fifo:
 	rm -rf /tmp/secure_*
