@@ -22,6 +22,8 @@ int opened_user_fifo = 0;
 int opened_srv_fifo = 0;
 int logged_request = 0;
 int logged_reply = 0;
+int logfile = 0;
+
 
 tlv_request_t full_request;
 tlv_reply_t request_reply;
@@ -34,20 +36,26 @@ void exit_user_process(ret_code_t ret)
 
     if (!logged_request) 
     {
-        if (logRequest(STDOUT_FILENO, pid, &full_request) < 0)
+        if (logRequest(logfile, pid, &full_request) < 0)
         {
-            fprintf(stderr, "logRequest: error writing request to stdout\n");
+            fprintf(stderr, "logRequest: error writing request to logfile\n");
             exit(RC_OTHER);
         }
+		if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
+		{
+			fprintf(stderr, "logRequest: error writing reply to stdout\n");
+			exit(RC_OTHER);
+		}
     }
 
     if (!logged_reply) 
     {
-        if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
+        if (logReply(logfile, pid, &request_reply) < 0)
         {
-            fprintf(stderr, "logRequest: error writing reply to stdout\n");
+            fprintf(stderr, "logRequest: error writing reply to logfile\n");
             exit(RC_OTHER);
         }
+
     }
    
     if (opened_srv_fifo)
@@ -128,14 +136,11 @@ int main(int argc, char *argv[])
         exit(RC_OTHER);
     }
 
-    /* Open log file and point STDOUT to it */
-    int logfile;
+    /* Open log file */
     if ((logfile = open(USER_LOGFILE, O_WRONLY | O_CREAT | O_APPEND, 0644)) == -1) {
         perror("Open user log file");
         exit(RC_OTHER);
     }
-    dup2(logfile, STDOUT_FILENO);
-
 
     /* Create user specific fifo */
     char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
@@ -179,9 +184,9 @@ int main(int argc, char *argv[])
     /* Set alarm */
     alarm(FIFO_TIMEOUT_SECS);
 
-    if (logRequest(STDOUT_FILENO, pid, &full_request) < 0)
+    if (logRequest(logfile, pid, &full_request) < 0)
     {
-        fprintf(stderr, "logRequest: error writing request to stdout\n");
+        fprintf(stderr, "logRequest: error writing request to logfile\n");
         exit(RC_OTHER);
     }
     logged_request = 1;
@@ -210,11 +215,17 @@ int main(int argc, char *argv[])
     
     alarm(0);
 
-    if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
+    if (logReply(logfile, pid, &request_reply) < 0)
+    {
+        fprintf(stderr, "logRequest: error writing reply to logfile\n");
+        exit(RC_OTHER);
+    }
+	if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
     {
         fprintf(stderr, "logRequest: error writing reply to stdout\n");
         exit(RC_OTHER);
     }
+
     logged_reply = 1;
 
     /* Free alocated memory */
