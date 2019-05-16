@@ -47,7 +47,7 @@ void init_request(tlv_request_t * full_request, int operation, int pid, int acco
     full_request->length = req_size;
 }
 
-int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int n_threads, uint32_t balance){
+int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int active_offices, uint32_t balance){
 
 	uint32_t rep_size = 0;
 
@@ -60,7 +60,6 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int n_thre
 	rep_size += sizeof(rep_header_t);
 
 	/* Init value.union */
-	int prov;
 	if(ret == 0){
 		switch(reply->type){
 			case OP_BALANCE:				
@@ -69,9 +68,7 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int n_thre
 				break;
 
 			case OP_SHUTDOWN:
-				if (get_value_sem_empty(&prov) != 0)
-					return -1;
-				reply->value.shutdown.active_offices = n_threads - prov;
+				reply->value.shutdown.active_offices = active_offices - 1;
 				rep_size += sizeof(rep_shutdown_t);
 				break;
 
