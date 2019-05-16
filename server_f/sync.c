@@ -9,6 +9,7 @@ static sem_t full, empty;
 static pthread_mutex_t accounts_db_mutex[MAX_BANK_ACCOUNTS];
 static pthread_mutex_t req_queue_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t log_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t active_office_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
 int lock_log_mutex(){
@@ -18,6 +19,19 @@ int lock_log_mutex(){
 int unlock_log_mutex(){
 	int ret;
 	if((ret = pthread_mutex_unlock(&log_mutex)) != 0){
+		perror("pthread_mutex_unlock:");
+		return ret;
+	}
+	return 0;
+}
+
+int lock_active_office_mutex(){
+	return pthread_mutex_lock(&active_office_mutex);
+}
+
+int unlock_active_office_mutex(){
+	int ret;
+	if((ret = pthread_mutex_unlock(&active_office_mutex)) != 0){
 		perror("pthread_mutex_unlock:");
 		return ret;
 	}
@@ -72,6 +86,14 @@ int del_sync(){
 
     /* Destroy request queue mutex */
 	if(pthread_mutex_destroy(&req_queue_mutex) != 0)
+		return -2;
+	
+	/* Destroy log mutex */
+	if(pthread_mutex_destroy(&log_mutex) != 0)
+		return -2;
+	
+	/* Destroy active office mutex */
+	if(pthread_mutex_destroy(&active_office_mutex) != 0)
 		return -2;
 
 	return 0;

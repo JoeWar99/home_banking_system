@@ -8,6 +8,10 @@ int lock_log_mutex();
 
 int unlock_log_mutex();
 
+int lock_active_office_mutex();
+
+int unlock_active_office_mutex();
+
 int init_sync(uint32_t n_threads);
 
 int del_sync();

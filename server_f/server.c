@@ -23,7 +23,7 @@
 
 
 bank_account_t *accounts_database[MAX_BANK_ACCOUNTS];
-int n_threads, balcony_open = 1;
+int n_threads, balcony_open = 1, active_offices = 0;
 queue_t *request_queue;
 
 int secure_srv;
@@ -242,6 +242,20 @@ void *balconies(void *arg)
 		if(!balcony_open && is_queue_empty(request_queue))
 			break;
 
+		/* Wait mutex */
+		if((ret = lock_active_office_mutex()) != 0){
+			fprintf(stderr, "lock_active_office_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+
+		active_offices++;
+
+		/* Signal mutex */
+		if((ret = unlock_active_office_mutex()) != 0){
+			fprintf(stderr, "unlock_active_office_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+
         /* Wait mutex */
 		if((ret = lock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, UNKNOWN_PID)) != 0){
 			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
@@ -315,7 +329,7 @@ void *balconies(void *arg)
         }
 
         tlv_reply_t request_reply;		
-        init_reply(&request_reply, first_request, req_ret, n_threads, balance);
+        init_reply(&request_reply, first_request, req_ret, active_offices, balance);
 		
         if (syncLogReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
         {
@@ -339,6 +353,20 @@ void *balconies(void *arg)
         }
 
         free(first_request);
+
+		/* Wait mutex */
+		if((ret = lock_active_office_mutex()) != 0){
+			fprintf(stderr, "lock_active_office_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+
+		active_offices--;
+
+		/* Signal mutex */
+		if((ret = unlock_active_office_mutex()) != 0){
+			fprintf(stderr, "unlock_active_office_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
     }
      
     if (syncLogBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread) < 0)
