@@ -224,11 +224,11 @@ int lock_queue_mutex(int balcony_id, sync_role_t role, pid_t sid){
 
 	logSyncMech(STDOUT_FILENO, balcony_id, SYNC_OP_MUTEX_LOCK, role, sid);
 
-
     if((ret = unlock_log_mutex())!=0){
         perror("unlock_log_mutex: error unlocking log_mutex");
         return ret;   
     }
+	
 	return pthread_mutex_lock(&req_queue_mutex);
 }
 

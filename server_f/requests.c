@@ -26,7 +26,6 @@ int create_request(const req_value_t * request_value, bank_account_t * accounts_
 	int ret_code = RC_OK;
 	uint32_t create_id = request_value->create.account_id;
 
-	// TODO: passar para dentro do create account para server tbm usar isto?? n sei se gosto
 	if(lock_accounts_db_mutex(create_id) != 0)
 		return RC_OTHER;
 	

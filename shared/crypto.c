@@ -1,16 +1,15 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-
-
 #include <unistd.h>
 #include <sys/types.h>
+
+#include "crypto.h"
+#include "constants.h"
 
 #define READ	0
 #define WRITE	1
 
-#include "crypto.h"
-#include "constants.h"
 
 int gen_random_int() {
     int val = rand() % 0xff;

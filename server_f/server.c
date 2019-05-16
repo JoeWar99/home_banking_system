@@ -9,17 +9,17 @@
 #include <sys/stat.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include "sync.h"
+#include "sync_log.h"
+#include "server_parse.h"
+#include "requests.h"
 #include "../shared/utilities.h"
 #include "../shared/constants.h"
 #include "../shared/types.h"
 #include "../shared/crypto.h"
 #include "../shared/queue.h"
-#include "sync.h"
 #include "../shared/account_utilities.h"
 #include "../shared/com_protocol.h"
-#include "sync_log.h"
-#include "server_parse.h"
-#include "requests.h"
 
 
 bank_account_t *accounts_database[MAX_BANK_ACCOUNTS];
@@ -29,136 +29,7 @@ queue_t *request_queue;
 int secure_srv;
 int dummy_connection;
 
-void *balconies(void *arg)
-{
-    int id_thread = *(int *)arg;
-    int pid_thread = pthread_self();
-    int ret, req_ret;
-    tlv_request_t *first_request;
-   
-    if (syncLogBankOfficeOpen(STDOUT_FILENO, id_thread, pid_thread) < 0) {
-        fprintf(stderr, "logBankOfficeOpen failed\n");
-    }
-
-    while (1)
-    {		
-        /* Wait full */
-		if((ret = wait_sem_full(id_thread)) != 0){
-			fprintf(stderr, "wait_sem_full: error %d\n", ret);
-            exit(RC_OTHER);
-		}
-
-        /* Server shutdown */
-		if(!balcony_open && is_queue_empty(request_queue))
-			break;
-
-        /* Wait mutex */
-		// TODO: ver este hardcoded 0 que estava
-		if((ret = lock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, 0)) != 0){
-			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
-            exit(RC_OTHER);
-		}
-
-        /* Take item */
-        first_request = (tlv_request_t *)queue_front(request_queue);
-        if (first_request == NULL)
-        {
-            fprintf(stderr, "queue_front: error getting first queue element\n");
-            exit(RC_OTHER);
-        }
-
-        /* Remove from queue */
-        if (queue_pop(request_queue) != 0)
-        {
-            fprintf(stderr, "queue_pop: error removing first queue element\n");
-        }
-
-        /* Signal mutex */
-		if((ret = unlock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, first_request->value.header.pid)) != 0){
-			fprintf(stderr, "unlock_queue_mutex: error %d\n", ret);
-            exit(RC_OTHER);
-		}
-
-        /* Signal empty */
-		if((ret = post_sem_empty(id_thread, first_request->value.header.pid)) != 0){
-			fprintf(stderr, "post_sem_empty: error %d\n", ret);
-            exit(RC_OTHER);
-		}
-   
-        if (syncLogRequest(STDOUT_FILENO, id_thread, first_request) < 0)
-        {
-            fprintf(stderr, "logRequest: error writing request to stdout\n");
-        }
-
-		uint32_t balance;
-        
-		switch (first_request->type)
-		{
-		case OP_CREATE_ACCOUNT:
-			req_ret = create_request(&first_request->value, accounts_database, id_thread);
-			break;
-
-		case OP_TRANSFER:
-			req_ret = transfer_request(&first_request->value, accounts_database, id_thread, &balance);
-			break;
-
-		case OP_BALANCE:
-			req_ret = balance_request(&first_request->value, accounts_database, id_thread, &balance);
-			break;
-
-		case OP_SHUTDOWN:
-			req_ret = shutdown_request(&first_request->value, accounts_database, id_thread, &balcony_open, secure_srv, dummy_connection);
-			break;
-			
-		default:
-			break;
-		}
-        
-
-        char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
-        init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
-
-        int user_fifo;
-        if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
-        {
-            perror("secure_fifo_name");
-            free(first_request);
-            continue;
-        }
-
-        tlv_reply_t request_reply;		
-        init_reply(&request_reply, first_request, req_ret, n_threads, balance);
-		
-        if (syncLogReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
-        {
-            fprintf(stderr, "logRequest: error writing reply to stdout\n");
-            free(first_request);
-            continue;
-        }
-
-        /* Send reply to user */
-        if (write_reply(user_fifo, &request_reply) != 0)
-        {
-            fprintf(stderr, "write_reply: error writing reply to server\n");
-            free(first_request);
-            continue;
-        }
-
-        /* Close user specific fifo */
-        if (close(user_fifo) != 0)
-        {
-            perror("error closing down server fifo");
-        }
-
-        free(first_request);
-    }
-     
-    if (syncLogBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread) < 0)    {
-        fprintf(stderr, "syncLogBankOfficeClose failed\n");
-    }
-
-	return NULL;
-}
+void *balconies(void *arg);
 
 int main(int argc, char *argv[])
 {
@@ -345,4 +216,134 @@ int main(int argc, char *argv[])
     }
 
     return RC_OK;
+}
+
+void *balconies(void *arg)
+{
+    int id_thread = *(int *)arg;
+    int pid_thread = pthread_self();
+    int ret, req_ret;
+    tlv_request_t *first_request;
+   
+    if (syncLogBankOfficeOpen(STDOUT_FILENO, id_thread, pid_thread) < 0) {
+        fprintf(stderr, "logBankOfficeOpen failed\n");
+    }
+
+    while (1)
+    {		
+        /* Wait full */
+		if((ret = wait_sem_full(id_thread)) != 0){
+			fprintf(stderr, "wait_sem_full: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+
+        /* Server shutdown */
+		if(!balcony_open && is_queue_empty(request_queue))
+			break;
+
+        /* Wait mutex */
+		// TODO: ver este hardcoded 0 que estava
+		if((ret = lock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, 0)) != 0){
+			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+
+        /* Take item */
+        first_request = (tlv_request_t *)queue_front(request_queue);
+        if (first_request == NULL)
+        {
+            fprintf(stderr, "queue_front: error getting first queue element\n");
+            exit(RC_OTHER);
+        }
+
+        /* Remove from queue */
+        if (queue_pop(request_queue) != 0)
+        {
+            fprintf(stderr, "queue_pop: error removing first queue element\n");
+        }
+
+        /* Signal mutex */
+		if((ret = unlock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, first_request->value.header.pid)) != 0){
+			fprintf(stderr, "unlock_queue_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+
+        /* Signal empty */
+		if((ret = post_sem_empty(id_thread, first_request->value.header.pid)) != 0){
+			fprintf(stderr, "post_sem_empty: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+   
+        if (syncLogRequest(STDOUT_FILENO, id_thread, first_request) < 0)
+        {
+            fprintf(stderr, "logRequest: error writing request to stdout\n");
+        }
+
+		uint32_t balance;
+        
+		switch (first_request->type)
+		{
+		case OP_CREATE_ACCOUNT:
+			req_ret = create_request(&first_request->value, accounts_database, id_thread);
+			break;
+
+		case OP_TRANSFER:
+			req_ret = transfer_request(&first_request->value, accounts_database, id_thread, &balance);
+			break;
+
+		case OP_BALANCE:
+			req_ret = balance_request(&first_request->value, accounts_database, id_thread, &balance);
+			break;
+
+		case OP_SHUTDOWN:
+			req_ret = shutdown_request(&first_request->value, accounts_database, id_thread, &balcony_open, secure_srv, dummy_connection);
+			break;
+			
+		default:
+			break;
+		}        
+
+        char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
+        init_secure_fifo_name(secure_fifo_name, first_request->value.header.pid);
+
+        int user_fifo;
+        if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
+        {
+            perror("secure_fifo_name");
+            free(first_request);
+            continue;
+        }
+
+        tlv_reply_t request_reply;		
+        init_reply(&request_reply, first_request, req_ret, n_threads, balance);
+		
+        if (syncLogReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
+        {
+            fprintf(stderr, "logRequest: error writing reply to stdout\n");
+            free(first_request);
+            continue;
+        }
+
+        /* Send reply to user */
+        if (write_reply(user_fifo, &request_reply) != 0)
+        {
+            fprintf(stderr, "write_reply: error writing reply to server\n");
+            free(first_request);
+            continue;
+        }
+
+        /* Close user specific fifo */
+        if (close(user_fifo) != 0)
+        {
+            perror("error closing down server fifo");
+        }
+
+        free(first_request);
+    }
+     
+    if (syncLogBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread) < 0)    {
+        fprintf(stderr, "syncLogBankOfficeClose failed\n");
+    }
+
+	return NULL;
 }
