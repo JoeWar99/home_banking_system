@@ -69,7 +69,6 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int n_thre
 				break;
 
 			case OP_SHUTDOWN:
-				// TODO: confirmar que e o full em active offices
 				if (get_value_sem_empty(&prov) != 0)
 					return -1;
 				reply->value.shutdown.active_offices = n_threads - prov;

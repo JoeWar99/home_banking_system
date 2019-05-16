@@ -139,17 +139,18 @@ int main(int argc, char *argv[])
         if (syncLogRequest(STDOUT_FILENO, MAIN_THREAD_ID, request) < 0)
         {
             fprintf(stderr, "syncLogRequest: error writing request to stdout\n");
-            exit(RC_OTHER);
         }
 
         /* Wait empty */
-		if((ret = wait_sem_empty(request->value.header.pid)) != 0){
+		if((ret = wait_sem_empty(MAIN_THREAD_ID, request->value.header.pid)) != 0)
+        {
 			fprintf(stderr, "wait_sem_empty: error %d\n", ret);
             exit(RC_OTHER);
 		}
 
         /* Wait mutex */
-		if((ret = lock_queue_mutex(MAIN_THREAD_ID, SYNC_ROLE_ACCOUNT, request->value.header.pid)) != 0){
+		if((ret = lock_queue_mutex(MAIN_THREAD_ID, SYNC_ROLE_ACCOUNT, request->value.header.pid)) != 0)
+        {
 			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
             exit(RC_OTHER);
 		}
@@ -168,7 +169,7 @@ int main(int argc, char *argv[])
 		}
         
         /* Signal full */
-		if((ret = post_sem_full(request->value.header.pid)) != 0){
+		if((ret = post_sem_full(MAIN_THREAD_ID, request->value.header.pid)) != 0){
 			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
             exit(RC_OTHER);
 		}
@@ -176,7 +177,7 @@ int main(int argc, char *argv[])
 
     /* Wait for threads to finish */
 	for(int i = 0; i < n_threads; i++){
-		post_sem_full(MAIN_THREAD_ID);
+		post_sem_full(MAIN_THREAD_ID, UNKNOWN_PID);
 	}
 
     for(int i = 0; i < n_threads; i++){
@@ -232,7 +233,7 @@ void *balconies(void *arg)
     while (1)
     {		
         /* Wait full */
-		if((ret = wait_sem_full(id_thread)) != 0){
+		if((ret = wait_sem_full(id_thread, UNKNOWN_PID)) != 0){
 			fprintf(stderr, "wait_sem_full: error %d\n", ret);
             exit(RC_OTHER);
 		}
@@ -242,8 +243,7 @@ void *balconies(void *arg)
 			break;
 
         /* Wait mutex */
-		// TODO: ver este hardcoded 0 que estava
-		if((ret = lock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, 0)) != 0){
+		if((ret = lock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, UNKNOWN_PID)) != 0){
 			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
             exit(RC_OTHER);
 		}
@@ -283,24 +283,24 @@ void *balconies(void *arg)
         
 		switch (first_request->type)
 		{
-		case OP_CREATE_ACCOUNT:
-			req_ret = create_request(&first_request->value, accounts_database, id_thread);
-			break;
+            case OP_CREATE_ACCOUNT:
+                req_ret = create_request(&first_request->value, accounts_database, id_thread);
+                break;
 
-		case OP_TRANSFER:
-			req_ret = transfer_request(&first_request->value, accounts_database, id_thread, &balance);
-			break;
+            case OP_TRANSFER:
+                req_ret = transfer_request(&first_request->value, accounts_database, id_thread, &balance);
+                break;
 
-		case OP_BALANCE:
-			req_ret = balance_request(&first_request->value, accounts_database, id_thread, &balance);
-			break;
+            case OP_BALANCE:
+                req_ret = balance_request(&first_request->value, accounts_database, id_thread, &balance);
+                break;
 
-		case OP_SHUTDOWN:
-			req_ret = shutdown_request(&first_request->value, accounts_database, id_thread, &balcony_open, secure_srv, dummy_connection);
-			break;
-			
-		default:
-			break;
+            case OP_SHUTDOWN:
+                req_ret = shutdown_request(&first_request->value, accounts_database, id_thread, &balcony_open, secure_srv, dummy_connection);
+                break;
+                
+            default:
+                break;
 		}        
 
         char secure_fifo_name[strlen(USER_FIFO_PATH_PREFIX) + WIDTH_PID + 1];
@@ -341,7 +341,8 @@ void *balconies(void *arg)
         free(first_request);
     }
      
-    if (syncLogBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread) < 0)    {
+    if (syncLogBankOfficeClose(STDOUT_FILENO, id_thread, pid_thread) < 0)
+    {
         fprintf(stderr, "syncLogBankOfficeClose failed\n");
     }
 

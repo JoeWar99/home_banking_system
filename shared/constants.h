@@ -39,3 +39,5 @@
 #define WIDTH_PID 5
 
 #define SHARED_SEM 0
+
+#define UNKNOWN_PID 0

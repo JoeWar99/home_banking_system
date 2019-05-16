@@ -1,8 +1,8 @@
-#include "sync.h"
-
 #include <pthread.h>
+#include <stdio.h>
 #include <semaphore.h>
-#include "../shared/sope.h"
+#include "sync.h"
+#include "sync_log.h"
 #include "../shared/constants.h"
 
 static sem_t full, empty;
@@ -27,43 +27,28 @@ int unlock_log_mutex(){
 int init_sync(uint32_t n_threads){
 	int ret;
 
-    if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-    logSyncMechSem(STDOUT_FILENO, MAIN_THREAD_ID, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, MAIN_THREAD_ID, 0);
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
+    if ((ret = syncLogSyncMechSem(STDOUT_FILENO, MAIN_THREAD_ID, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, MAIN_THREAD_ID, 0)) < 0) 
+	{
+		perror("syncLogSyncMechSem error");
+		return ret;
+	}
 
     /* Initialize FULL semaphore with 0 */
     if (sem_init(&full, SHARED_SEM, 0) != 0)
 		return -1;
 
-	
-	if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-    logSyncMechSem(STDOUT_FILENO, MAIN_THREAD_ID, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, MAIN_THREAD_ID, n_threads);
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
-
-
+    if ((ret = syncLogSyncMechSem(STDOUT_FILENO, MAIN_THREAD_ID, SYNC_OP_SEM_INIT, SYNC_ROLE_PRODUCER, MAIN_THREAD_ID, n_threads)) < 0) 
+	{
+		perror("syncLogSyncMechSem error");
+		return ret;
+	}
 
     /* Initialize EMPTY semaphore with number of threads */
     if (sem_init(&empty, SHARED_SEM, n_threads) != 0)
 		return -1;
 
 	/* Initialize account db corresponding mutexes */
-	 for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS; i++)
+	for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS; i++)
         if(pthread_mutex_init(&accounts_db_mutex[i], NULL) != 0)
 			return -2;
 	
@@ -102,30 +87,22 @@ int get_value_sem_empty(int * result){
 	return 0;
 }
 
-int wait_sem_empty(pid_t sid){
+int wait_sem_empty(int id, pid_t sid){
 	int empty_aux, ret;
 	if ((ret = get_value_sem_empty(&empty_aux)) != 0) {
 		perror("sem_get_value:");
 		return ret;		
 	}
-	
-	if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
 
-	logSyncMechSem(STDOUT_FILENO, MAIN_THREAD_ID, SYNC_OP_SEM_WAIT, SYNC_ROLE_PRODUCER, sid, empty_aux);
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
-
+	if ((ret = syncLogSyncMechSem(STDOUT_FILENO, id, SYNC_OP_SEM_WAIT, SYNC_ROLE_PRODUCER, sid, empty_aux)) < 0) {
+		perror("syncLogSyncMechSem error");
+		return ret;
+	}
 	
 	return sem_wait(&empty);
 }
 
-int post_sem_empty(int balcony_id, pid_t sid){
+int post_sem_empty(int id, pid_t sid){
 	int empty_aux, ret;
 	if ((ret = get_value_sem_empty(&empty_aux)) != 0)
 	{
@@ -138,18 +115,10 @@ int post_sem_empty(int balcony_id, pid_t sid){
 		return ret;
 	}
 
-	 if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-
-	logSyncMechSem(STDOUT_FILENO, balcony_id, SYNC_OP_SEM_POST, SYNC_ROLE_CONSUMER, sid, empty_aux);
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
+	if ((ret = syncLogSyncMechSem(STDOUT_FILENO, id, SYNC_OP_SEM_POST, SYNC_ROLE_CONSUMER, sid, empty_aux)) < 0) {
+		perror("syncLogSyncMechSem error");
+		return ret;
+	}
 
 	return 0;
 }
@@ -164,7 +133,7 @@ int get_value_sem_full(int * result){
 	return 0;
 }
 
-int wait_sem_full(int balcony_id){
+int wait_sem_full(int id, pid_t sid){
 	int full_aux, ret;
 	if ((ret = get_value_sem_full(&full_aux)) != 0)
 	{
@@ -172,23 +141,15 @@ int wait_sem_full(int balcony_id){
 		return ret;
 	}
 
-	// TODO: ver este 0
-	 if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-	logSyncMechSem(STDOUT_FILENO, balcony_id, SYNC_OP_SEM_WAIT, SYNC_ROLE_CONSUMER, 0, full_aux);
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
+	if ((ret = syncLogSyncMechSem(STDOUT_FILENO, id, SYNC_OP_SEM_WAIT, SYNC_ROLE_CONSUMER, sid, full_aux)) < 0) {
+		perror("syncLogSyncMechSem error");
+		return ret;
+	}
 
 	return sem_wait(&full);
 }
 
-int post_sem_full(pid_t sid){
+int post_sem_full(int id, pid_t sid){
 	int full_aux, ret;
 	if ((ret = get_value_sem_full(&full_aux)) != 0){
 		perror("sem_get_value:");
@@ -199,17 +160,11 @@ int post_sem_full(pid_t sid){
 		perror("sem_post:");
 		return ret;
 	}
-	 if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
 
-	logSyncMechSem(STDOUT_FILENO, MAIN_THREAD_ID, SYNC_OP_SEM_POST, SYNC_ROLE_PRODUCER, sid, full_aux);
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
+	if ((ret = syncLogSyncMechSem(STDOUT_FILENO, id, SYNC_OP_SEM_POST, SYNC_ROLE_PRODUCER, sid, full_aux)) < 0) {
+		perror("syncLogSyncMechSem error");
+		return ret;
+	}
 
 	return 0;
 }
@@ -217,17 +172,10 @@ int post_sem_full(pid_t sid){
 int lock_queue_mutex(int balcony_id, sync_role_t role, pid_t sid){
 	
 	int ret;
-	if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-	logSyncMech(STDOUT_FILENO, balcony_id, SYNC_OP_MUTEX_LOCK, role, sid);
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
+	if ((ret = syncLogSyncMech(STDOUT_FILENO, balcony_id, SYNC_OP_MUTEX_LOCK, role, sid)) < 0) {
+		perror("syncLogSyncMechSem error");
+		return ret;
+	}
 	
 	return pthread_mutex_lock(&req_queue_mutex);
 }
@@ -240,17 +188,10 @@ int unlock_queue_mutex(int balcony_id, sync_role_t role, pid_t sid){
 		return ret;
 	}
 
-	 if((ret = lock_log_mutex())!=0){
-        perror("lock_log_mutex: error locking log_mutex");
-        return ret;  
-    }
-
-    logSyncMech(STDOUT_FILENO, balcony_id, SYNC_OP_MUTEX_UNLOCK, role, sid);
-
-    if((ret = unlock_log_mutex())!=0){
-        perror("unlock_log_mutex: error unlocking log_mutex");
-        return ret;   
-    }
+    if((ret = syncLogSyncMech(STDOUT_FILENO, balcony_id, SYNC_OP_MUTEX_UNLOCK, role, sid)) < 0) {
+		perror("syncLogSyncMechSem error");
+		return ret;
+	}
 
 	return 0;
 }
