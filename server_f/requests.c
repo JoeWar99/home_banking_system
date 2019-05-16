@@ -202,7 +202,7 @@ static int is_valid_transfer_request(const req_value_t * request_value, bank_acc
 	/* Verify password - already done */
 
 	/* Return OP_NALLOW if the request is made by the admin */
-	if(orig_id == ADMIN_ACCOUNT_ID)
+	if(orig_id == ADMIN_ACCOUNT_ID || dest_id == ADMIN_ACCOUNT_ID)
 		return RC_OP_NALLOW;
 
 	/* Verify if destination id exists */
