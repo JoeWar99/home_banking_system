@@ -24,6 +24,8 @@ int logged_request = 0;
 int logged_reply = 0;
 int logfile = 0;
 
+char *req_args[3];
+int req_arg_count = 0;
 
 tlv_request_t full_request;
 tlv_reply_t request_reply;
@@ -41,24 +43,24 @@ void exit_user_process(ret_code_t ret)
             fprintf(stderr, "logRequest: error writing request to logfile\n");
             exit(RC_OTHER);
         }
+    }
+
+    if (!logged_reply) 
+    {
+        init_reply_error(&request_reply, &full_request, ret);
+        if (logReply(logfile, pid, &request_reply) < 0)
+        {
+            fprintf(stderr, "logRequest: error writing reply to logfile\n");
+            exit(RC_OTHER);
+        }
 		if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
 		{
 			fprintf(stderr, "logRequest: error writing reply to stdout\n");
 			exit(RC_OTHER);
 		}
     }
-
-    if (!logged_reply) 
-    {
-        if (logReply(logfile, pid, &request_reply) < 0)
-        {
-            fprintf(stderr, "logRequest: error writing reply to logfile\n");
-            exit(RC_OTHER);
-        }
-
-    }
    
-    if (opened_srv_fifo)
+    if (opened_srv_fifo) 
     {
         if (close(secure_svr) != 0)
         {
@@ -67,7 +69,8 @@ void exit_user_process(ret_code_t ret)
         }
     }
 
-    if (opened_user_fifo) {
+    if (opened_user_fifo) 
+    {
         if (close(user_fifo) != 0)
         {
             perror("close: error closing down user fifo");
@@ -82,13 +85,17 @@ void exit_user_process(ret_code_t ret)
         exit(RC_OTHER);
     }
 
+    /* Free alocated memory */
+    for (int i = 0; i < req_arg_count; i++)
+    {
+        free(req_args[i]);
+    }
+
     exit(ret);
 }
 
 void sigalarm_handler()
 {
-    // TODO faltam os frees quando sai por causa do alarme
-    init_reply_error(&request_reply, &full_request, RC_SRV_TIMEOUT);
     exit_user_process(RC_SRV_TIMEOUT);
 }
 
@@ -115,9 +122,6 @@ int main(int argc, char *argv[])
     op_delay = atoi(argv[3]);
     operation = atoi(argv[4]);
 
-    char *req_args[3];
-    int req_arg_count = 0;
-
     if (!valid_args(account_id, pwd, op_delay, operation))
     {
         fprintf(stderr, "Invalid arguments given\n");
@@ -137,7 +141,8 @@ int main(int argc, char *argv[])
     }
 
     /* Open log file */
-    if ((logfile = open(USER_LOGFILE, O_WRONLY | O_CREAT | O_APPEND, 0644)) == -1) {
+    if ((logfile = open(USER_LOGFILE, O_WRONLY | O_CREAT | O_APPEND, 0644)) == -1) 
+    {
         perror("Open user log file");
         exit(RC_OTHER);
     }
@@ -160,13 +165,6 @@ int main(int argc, char *argv[])
     if ((secure_svr = open(SERVER_FIFO_PATH, O_WRONLY | O_NONBLOCK)) == -1)
     {
         /* SERVER DOWN */
-        init_reply_error(&request_reply, &full_request, RC_SRV_DOWN);
-
-        for (int i = 0; i < req_arg_count; i++)
-        {
-            free(req_args[i]);
-        }
-
         exit_user_process(RC_SRV_DOWN);
     }
     opened_srv_fifo = 1;
@@ -177,9 +175,6 @@ int main(int argc, char *argv[])
         fprintf(stderr, "write_request: error writing request to server\n");
         exit(RC_OTHER);
     }
-
-	// TODO: isto nunca e usado!! ver melhor
-    //int error_due_to_alarm = 0;
 
     /* Set alarm */
     alarm(FIFO_TIMEOUT_SECS);
@@ -195,13 +190,6 @@ int main(int argc, char *argv[])
     if ((user_fifo = open(secure_fifo_name, O_RDONLY)) == -1)
     {
         /* USER DOWN */
-        init_reply_error(&request_reply, &full_request, RC_USR_DOWN);
-
-        for (int i = 0; i < req_arg_count; i++)
-        {
-            free(req_args[i]);
-        }
-
         exit_user_process(RC_USR_DOWN);
     }
     opened_user_fifo = 1;
@@ -215,24 +203,19 @@ int main(int argc, char *argv[])
     
     alarm(0);
 
+    /* Write reply in logfile */
     if (logReply(logfile, pid, &request_reply) < 0)
     {
         fprintf(stderr, "logRequest: error writing reply to logfile\n");
         exit(RC_OTHER);
     }
+    /* Show user the reply */
 	if (logReply(STDOUT_FILENO, pid, &request_reply) < 0)
     {
         fprintf(stderr, "logRequest: error writing reply to stdout\n");
         exit(RC_OTHER);
     }
-
     logged_reply = 1;
-
-    /* Free alocated memory */
-    for (int i = 0; i < req_arg_count; i++)
-    {
-        free(req_args[i]);
-    }
 
     exit_user_process(RC_OK);
 }
