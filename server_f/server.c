@@ -133,8 +133,9 @@ int main(int argc, char *argv[])
             break;
         }
 
-		if(!balcony_open && ret_val == 0)
+		if(!balcony_open && ret_val == 0) {
 			break;
+        }
        
         if (syncLogRequest(STDOUT_FILENO, MAIN_THREAD_ID, request) < 0)
         {
