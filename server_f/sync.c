@@ -106,6 +106,8 @@ int get_value_sem_empty(int * result){
 		perror("sem_get_value:");
 		return ret;
 	}
+	if(*result < 0)
+		*result = 0;
 	return 0;
 }
 
@@ -152,6 +154,8 @@ int get_value_sem_full(int * result){
 		perror("sem_get_value:");
 		return ret;
 	}
+	if(*result < 0)
+		*result = 0;
 	return 0;
 }
 

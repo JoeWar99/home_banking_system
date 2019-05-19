@@ -20,10 +20,11 @@
 #include "../shared/queue.h"
 #include "../shared/account_utilities.h"
 #include "../shared/com_protocol.h"
+#include "active_offices.h"
 
 
 bank_account_t *accounts_database[MAX_BANK_ACCOUNTS];
-int n_threads, balcony_open = 1, active_offices = 0;
+int n_threads, balcony_open = 1;
 queue_t *request_queue;
 
 int secure_srv;
@@ -79,6 +80,12 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Could not create fifo %s\n", SERVER_FIFO_PATH);
             exit(RC_OTHER);
         }
+		unlink(SERVER_FIFO_PATH);
+		 if (mkfifo(SERVER_FIFO_PATH, 0660) < 0)
+    	{
+			perror("mkfifo:");
+			exit(RC_OTHER);
+		}
     }
 
     /* Create balconies */
@@ -199,8 +206,9 @@ int main(int argc, char *argv[])
 	}
 
     /* Free accounts database allocated memory */
-    for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS; i++)
+    for (uint32_t i = 0; i < MAX_BANK_ACCOUNTS; i++){
         free(accounts_database[i]);
+	}
 
     /* Close server fifo descriptor */
     if (close(secure_srv) != 0)
@@ -238,23 +246,14 @@ void *balconies(void *arg)
             exit(RC_OTHER);
 		}
 
-        /* Server shutdown */
+        /* SerNULLver shutdown */
 		if(!balcony_open && is_queue_empty(request_queue))
 			break;
 
-		/* Wait mutex */
-		if((ret = lock_active_office_mutex()) != 0){
-			fprintf(stderr, "lock_active_office_mutex: error %d\n", ret);
-            exit(RC_OTHER);
-		}
-
-		active_offices++;
-
-		/* Signal mutex */
-		if((ret = unlock_active_office_mutex()) != 0){
-			fprintf(stderr, "unlock_active_office_mutex: error %d\n", ret);
-            exit(RC_OTHER);
-		}
+		if(increase_active_offices() != 0){
+			fprintf(stderr, "increase_active_offices\n");
+			exit(RC_OTHER);
+		}		
 
         /* Wait mutex */
 		if((ret = lock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, UNKNOWN_PID)) != 0){
@@ -323,49 +322,41 @@ void *balconies(void *arg)
         int user_fifo;
         if ((user_fifo = open(secure_fifo_name, O_WRONLY)) == -1)
         {
-            perror("secure_fifo_name");
-            free(first_request);
-            continue;
+            // perror("secure_fifo_name");
+            // free(first_request);
+            // continue;
+			if(req_ret != RC_OK)
+				req_ret = RC_USR_DOWN;
         }
 
         tlv_reply_t request_reply;		
-        init_reply(&request_reply, first_request, req_ret, active_offices, balance);
+        init_reply(&request_reply, first_request, req_ret, balance);
 		
         if (syncLogReply(STDOUT_FILENO, id_thread, &request_reply) < 0)
         {
             fprintf(stderr, "logRequest: error writing reply to stdout\n");
             free(first_request);
+			if(decrease_active_offices() != 0){
+				fprintf(stderr, "decrease_active_offices error\n");
+				exit(RC_OTHER);
+			}
             continue;
         }
 
-        /* Send reply to user */
-        if (write_reply(user_fifo, &request_reply) != 0)
-        {
-            fprintf(stderr, "write_reply: error writing reply to server\n");
-            free(first_request);
-            continue;
-        }
-
-        /* Close user specific fifo */
-        if (close(user_fifo) != 0)
-        {
-            perror("error closing down server fifo");
-        }
+		if(user_fifo != -1){
+			/* Send reply to user */
+			if (write_reply(user_fifo, &request_reply) != 0)
+				fprintf(stderr, "write_reply: error writing reply to server\n");
+			/* Close user specific fifo */
+			if (close(user_fifo) != 0)
+				perror("error closing down server fifo");
+		}
 
         free(first_request);
 
-		/* Wait mutex */
-		if((ret = lock_active_office_mutex()) != 0){
-			fprintf(stderr, "lock_active_office_mutex: error %d\n", ret);
-            exit(RC_OTHER);
-		}
-
-		active_offices--;
-
-		/* Signal mutex */
-		if((ret = unlock_active_office_mutex()) != 0){
-			fprintf(stderr, "unlock_active_office_mutex: error %d\n", ret);
-            exit(RC_OTHER);
+		if(decrease_active_offices() != 0){
+			fprintf(stderr, "decrease_active_offices error\n");
+			exit(RC_OTHER);
 		}
     }
      

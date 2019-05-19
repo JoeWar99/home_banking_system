@@ -4,6 +4,7 @@
 
 #include "com_protocol.h"
 #include "utilities.h"
+#include "../server_f/active_offices.h"
 #include "../server_f/sync.h"
 
 
@@ -47,7 +48,7 @@ void init_request(tlv_request_t * full_request, int operation, int pid, int acco
     full_request->length = req_size;
 }
 
-int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int active_offices, uint32_t balance){
+int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, uint32_t balance){
 
 	uint32_t rep_size = 0;
 
@@ -68,7 +69,7 @@ int init_reply(tlv_reply_t * reply, tlv_request_t * request, int ret, int active
 				break;
 
 			case OP_SHUTDOWN:
-				reply->value.shutdown.active_offices = active_offices - 1;
+				reply->value.shutdown.active_offices = get_active_offices() - 1;
 				rep_size += sizeof(rep_shutdown_t);
 				break;
 
