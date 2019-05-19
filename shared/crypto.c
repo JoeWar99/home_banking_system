@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 
 #include "crypto.h"
 #include "constants.h"
@@ -94,6 +95,8 @@ int gen_hash(const char * pwd, char * salt, char * hash) {
 		}
 
 		hash[HASH_LEN] = '\0';
+
+		waitpid(pid, NULL, 0);
 
 	}
 	else{
