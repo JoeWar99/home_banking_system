@@ -140,8 +140,10 @@ int main(int argc, char *argv[])
             break;
         }
 
-		if(!balcony_open && ret_val == 0)
-			break;
+		if(!balcony_open && ret_val == 0) {
+			free(request);
+            break;
+        }
        
         if (syncLogRequest(STDOUT_FILENO, MAIN_THREAD_ID, request) < 0)
         {
