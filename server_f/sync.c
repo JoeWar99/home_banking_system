@@ -128,14 +128,15 @@ int wait_sem_empty(int id, pid_t sid){
 
 int post_sem_empty(int id, pid_t sid){
 	int empty_aux, ret;
-	if ((ret = get_value_sem_empty(&empty_aux)) != 0)
-	{
-		perror("sem_get_value:");
-		return ret;
-	}
 
 	if((ret = sem_post(&empty)) != 0){
 		perror("sem_post:");
+		return ret;
+	}
+
+	if ((ret = get_value_sem_empty(&empty_aux)) != 0)
+	{
+		perror("sem_get_value:");
 		return ret;
 	}
 
@@ -177,13 +178,14 @@ int wait_sem_full(int id, pid_t sid){
 
 int post_sem_full(int id, pid_t sid){
 	int full_aux, ret;
-	if ((ret = get_value_sem_full(&full_aux)) != 0){
-		perror("sem_get_value:");
-		return ret;
-	}
 
 	if ((ret = sem_post(&full)) != 0){
 		perror("sem_post:");
+		return ret;
+	}
+	
+	if ((ret = get_value_sem_full(&full_aux)) != 0){
+		perror("sem_get_value:");
 		return ret;
 	}
 

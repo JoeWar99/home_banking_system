@@ -246,8 +246,22 @@ void *balconies(void *arg)
             exit(RC_OTHER);
 		}
 
-        /* SerNULLver shutdown */
-		if(!balcony_open && is_queue_empty(request_queue))
+        /* Wait mutex */
+		if((ret = lock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, UNKNOWN_PID)) != 0){
+			fprintf(stderr, "lock_queue_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+
+        int queue_empty = is_queue_empty(request_queue);
+
+        /* Signal mutex */
+		if((ret = unlock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, first_request->value.header.pid)) != 0){
+			fprintf(stderr, "unlock_queue_mutex: error %d\n", ret);
+            exit(RC_OTHER);
+		}
+
+        /* Server shutdown */
+		if(!balcony_open && queue_empty)
 			break;
 
 		if(increase_active_offices() != 0){
