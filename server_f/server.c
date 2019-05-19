@@ -255,7 +255,7 @@ void *balconies(void *arg)
         int queue_empty = is_queue_empty(request_queue);
 
         /* Signal mutex */
-		if((ret = unlock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, first_request->value.header.pid)) != 0){
+		if((ret = unlock_queue_mutex(id_thread, SYNC_ROLE_CONSUMER, UNKNOWN_PID)) != 0){
 			fprintf(stderr, "unlock_queue_mutex: error %d\n", ret);
             exit(RC_OTHER);
 		}
