@@ -4,9 +4,9 @@
 #include "server_parse.h"
 
 int valid_args(int n_threads, char * pwd) {
-    if (n_threads <= 0)
+    if (n_threads <= 0 || n_threads > MAX_BANK_OFFICES)
     {
-        fprintf(stderr, "Error: The numbers of threads must be greater than 0\n");
+        fprintf(stderr, "Error: The numbers of threads must be between 0 and %d\n", MAX_BANK_OFFICES);
         return 0;
     }
 

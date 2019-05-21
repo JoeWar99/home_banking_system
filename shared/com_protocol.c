@@ -29,16 +29,16 @@ void init_request(tlv_request_t * full_request, int operation, int pid, int acco
     {
         case OP_CREATE_ACCOUNT:
             user_create = &(request_value->create);
-            user_create->account_id = atoi(req_args[0]);
-            user_create->balance = atoi(req_args[1]);
+            user_create->account_id = str_to_int(req_args[0]);
+            user_create->balance = str_to_lu(req_args[1]);
             strcpy(user_create->password, req_args[2]);
             req_size += sizeof(req_create_account_t);
             break;
 
         case OP_TRANSFER:
             user_transfer = &(request_value->transfer);
-            user_transfer->account_id = atoi(req_args[0]);
-            user_transfer->amount = atoi(req_args[1]);
+            user_transfer->account_id = str_to_int(req_args[0]);
+            user_transfer->amount = str_to_lu(req_args[1]);
             req_size += sizeof(req_transfer_t);
             break;
 		default:

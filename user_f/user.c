@@ -51,10 +51,15 @@ int main(int argc, char *argv[])
     int pid = getpid();
     int account_id, op_delay, operation;
 
-    account_id = atoi(argv[1]);
+    account_id = str_to_int(argv[1]);
+    if (account_id == -1) return -1;
+
     char *pwd = argv[2];
-    op_delay = atoi(argv[3]);
-    operation = atoi(argv[4]);
+    op_delay = str_to_int(argv[3]);
+    if (op_delay == -1) return -1;
+
+    operation = str_to_int(argv[4]);
+    if (operation == -1) return -1;
 
     if (!valid_args(account_id, pwd, op_delay, operation))
     {

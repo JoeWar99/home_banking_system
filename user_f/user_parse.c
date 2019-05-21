@@ -70,8 +70,12 @@ int valid_req_args(int operation, char ** req_args, int req_arg_count) {
                 return 0;
             }
 
-            int account_id = atoi(req_args[0]);
+            int account_id = str_to_int(req_args[0]);
+            if (account_id == -1) return 0;
+
             long unsigned int balance = str_to_lu(req_args[1]);
+            if (balance == INVALID_BALANCE) return 0;
+            
             char * pwd = req_args[2];
 
             if (!valid_user_account_id(account_id)) {
@@ -103,8 +107,11 @@ int valid_req_args(int operation, char ** req_args, int req_arg_count) {
                 return 0;
             }
 
-            int dest_account_id = atoi(req_args[0]);
+            int dest_account_id = str_to_int(req_args[0]);
+            if (dest_account_id == -1) return 0;
+
             long unsigned int amount = str_to_lu(req_args[1]);
+            if (amount == INVALID_BALANCE) return 0;
             
             if (!valid_user_account_id(dest_account_id)) {
                 fprintf(stderr, "Invalid account ID: %d\n", dest_account_id);

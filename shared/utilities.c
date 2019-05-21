@@ -3,6 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 
+#include "constants.h"
 #include "utilities.h"
 
 void concat(char *str1[], char *str2, size_t n)
@@ -33,5 +34,19 @@ int max(int a, int b) {
 long unsigned int str_to_lu(char * str) {
 	char *ptr1;
 	long unsigned int balance = strtoul(str, &ptr1, 10);
+	if (strlen(ptr1) > 0) {
+		fprintf(stderr, "Invalid long unsigned number\n");
+		return INVALID_BALANCE;
+	}
+	return balance;
+}
+
+int str_to_int(char * str) {
+	char *ptr1;
+	int balance = strtol(str, &ptr1, 10);
+	if (strlen(ptr1) > 0) {
+		fprintf(stderr, "Invalid int number\n");
+		return -1;
+	}
 	return balance;
 }

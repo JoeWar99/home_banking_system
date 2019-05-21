@@ -43,7 +43,19 @@ int main(int argc, char *argv[])
     /* Generate new random seed */
     srand(time(NULL));
 
-    n_threads = min(atoi(argv[1]), MAX_BANK_OFFICES);
+    char * garbage = NULL;
+    n_threads = strtol(argv[1], &garbage, 10);
+
+    if(errno == ERANGE) {
+        fprintf(stderr, "The number of threads could not be represented.\n");
+        exit(RC_OTHER);
+    }
+
+    if (strlen(garbage) > 0) {
+        fprintf(stderr, "Invalid <n_threads> value\n");
+        exit(RC_OTHER);
+    }
+
     char *pwd = argv[2];
     int ret;
 
