@@ -27,7 +27,7 @@ The server is composed by a collection of "balconies", simulated using **threads
 * C
 
 ### Group Members
-* [José Guerra](https://github.com/lockdowpt "lockdowpt")
+* [José Guerra](https://github.com/joewar99 "joewar99")
 * [Manuel Coutinho](https://github.com/ManelCoutinho "ManelCoutinho")
 * [Mário Gil](https://github.com/GambuzX "GambuzX")
 
